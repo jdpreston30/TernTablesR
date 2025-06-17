@@ -11,7 +11,7 @@
 #'
 #' @return A tibble with one row per variable, grouped summary statistics across the 3 levels, test type, and p-value.
 #' @export
-TernTables3v <- function(data,
+Tern3v <- function(data,
                          vars = NULL,
                          exclude_vars = NULL,
                          group_var,
