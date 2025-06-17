@@ -9,7 +9,7 @@
 #' @param output_docx Optional filename to write Word document output
 #' @return A tibble with formatted summary statistics and p-values.
 #' @export
-TernTables2v <- function(data,
+Tern2v <- function(data,
                          vars = NULL,
                          exclude_vars = NULL,
                          group_var,
