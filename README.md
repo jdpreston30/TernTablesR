@@ -7,10 +7,8 @@ You can install the development version of TeRnTables from GitHub:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("yourusername/TeRnTables")
+devtools::install_github("jdpreston30/TeRnTables")
 ```
-
-Replace `"yourusername"` with your actual GitHub username.
 
 ## 📦 Functions
 
