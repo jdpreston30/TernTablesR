@@ -1,26 +1,26 @@
-# TernTables
-**TernTables** is a lightweight R package for generating clean summary tables with appropriate statistical tests. It supports two-level and three-level group comparisons for binary, continuous, and ordinal variables, and includes options for exporting tables to Word and Excel.
+# TeRnTables
+**TeRnTables** is a lightweight R package for generating clean summary tables with appropriate statistical tests. It supports two-level and three-level group comparisons for binary, continuous, and ordinal variables, and includes options for exporting tables to Word and Excel.
 
 ## 🚀 Installation
 
-You can install the development version of TernTables from GitHub:
+You can install the development version of TeRnTables from GitHub:
 
 ```r
 # install.packages("devtools")
-devtools::install_github("yourusername/TernTables")
+devtools::install_github("yourusername/TeRnTables")
 ```
 
 Replace `"yourusername"` with your actual GitHub username.
 
 ## 📦 Functions
 
-### `TernTables2v()`
+### `TeRnTables2v()`
 Generates summary tables for a **binary grouping variable**. Applies:
 - **Welch’s t-test** or **Wilcoxon rank-sum test** for continuous variables (based on Shapiro-Wilk normality test).
 - **Chi-squared** or **Fisher’s exact test** for categorical variables.
 - **Wilcoxon test** for ordinal variables explicitly specified.
 
-### `TernTables3v()`
+### `TeRnTables3v()`
 Generates summary tables for a **3-level grouping variable**. Applies:
 - **ANOVA** or **Kruskal-Wallis** for continuous and ordinal variables.
 - **Chi-squared** or **Fisher’s exact test** for categorical variables.
@@ -30,7 +30,7 @@ Generates summary tables for a **3-level grouping variable**. Applies:
 ### Two-level comparison
 
 ```r
-TernTables2v(
+TeRnTables2v(
   data = your_data,
   group_var = "treatment_group",  # binary variable
   exclude_vars = c("ID"),
@@ -43,7 +43,7 @@ TernTables2v(
 ### Three-level comparison
 
 ```r
-TernTables3v(
+TeRnTables3v(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
   exclude_vars = c("ID"),
