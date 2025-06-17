@@ -2,15 +2,15 @@
 % Please edit documentation in R/export_to_word.r
 \name{export_to_word}
 \alias{export_to_word}
-\title{Export TernTables output to a formatted Word document}
+\title{Export TernTablesR output to a formatted Word document}
 \usage{
 export_to_word(tbl, filename)
 }
 \arguments{
-\item{tbl}{A tibble created by TernTables2v}
+\item{tbl}{A tibble created by Tern2v or Tern3v}
 
 \item{filename}{Output file path ending in .docx}
 }
 \description{
-Export TernTables output to a formatted Word document
+Export TernTablesR output to a formatted Word document
 }

@@ -1,6 +1,6 @@
-#' Export TernTables output to a formatted Word document
+#' Export TernTablesR output to a formatted Word document
 #'
-#' @param tbl A tibble created by TernTables2v
+#' @param tbl A tibble created by Tern2v or Tern3v
 #' @param filename Output file path ending in .docx
 #' @export
 export_to_word <- function(tbl, filename) {

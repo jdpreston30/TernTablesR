@@ -12,13 +12,13 @@ devtools::install_github("jdpreston30/TernTablesR")
 
 ## 📦 Functions
 
-### `TernTablesR2v()`
+### `Tern2v()`
 Generates summary tables for a **binary grouping variable**. Applies:
 - **Welch’s t-test** or **Wilcoxon rank-sum test** for continuous variables (based on Shapiro-Wilk normality test).
 - **Chi-squared** or **Fisher’s exact test** for categorical variables.
 - **Wilcoxon test** for ordinal variables explicitly specified.
 
-### `TernTablesR3v()`
+### `Tern3v()`
 Generates summary tables for a **3-level grouping variable**. Applies:
 - **ANOVA** or **Kruskal-Wallis** for continuous and ordinal variables.
 - **Chi-squared** or **Fisher’s exact test** for categorical variables.
@@ -28,7 +28,7 @@ Generates summary tables for a **3-level grouping variable**. Applies:
 ### Two-level comparison
 
 ```r
-TernTablesR2v(
+Tern2v(
   data = your_data,
   group_var = "treatment_group",  # binary variable
   exclude_vars = c("ID"),
@@ -41,7 +41,7 @@ TernTablesR2v(
 ### Three-level comparison
 
 ```r
-TernTablesR3v(
+Tern3v(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
   exclude_vars = c("ID"),
