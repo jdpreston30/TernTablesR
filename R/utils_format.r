@@ -17,16 +17,16 @@ fmt_p <- function(p) {
     return(sci)
   }
 
+  if (p >= 0.001 && p < 0.1) {
+    return(sprintf("%.3f", round(p, 3)))
+  }
+
   if (p >= 0.94 && p < 1) {
     return(sprintf("%.3f", round(p, 3)))
   }
 
   if (p == 1) {
     return(">0.99")
-  }
-
-  if (p >= 0.04 && p <= 0.06) {
-    return(sprintf("%.3f", round(p, 3)))
   }
 
   return(sprintf("%.2f", round(p, 2)))
