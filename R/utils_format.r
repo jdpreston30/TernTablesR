@@ -42,4 +42,3 @@ format_val <- function(mean, sd) {
 export_to_excel <- function(tbl, filename) {
   writexl::write_xlsx(tbl, path = filename)
 }
-

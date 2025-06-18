@@ -12,27 +12,31 @@ devtools::install_github("jdpreston30/TernTablesR")
 
 ## 📦 Functions
 
-### `Tern2v()`
-Generates summary tables for a **binary grouping variable**. Applies:
-- **Welch’s t-test** or **Wilcoxon rank-sum test** for continuous variables (based on Shapiro-Wilk normality test).
-- **Chi-squared** or **Fisher’s exact test** for categorical variables.
-- **Wilcoxon test** for ordinal variables explicitly specified.
+### `TernTable()`
 
-### `Tern3v()`
-Generates summary tables for a **3-level grouping variable**. Applies:
-- **ANOVA** or **Kruskal-Wallis** for continuous and ordinal variables.
-- **Chi-squared** or **Fisher’s exact test** for categorical variables.
+Generates summary tables for either **binary** or **3-level categorical** grouping variables. Automatically applies appropriate statistical tests based on variable type and number of groups:
+
+- **Continuous variables**:
+  - **2 groups**: Welch’s *t*-test or Wilcoxon rank-sum (based on Shapiro-Wilk test for normality)
+  - **3+ groups**: ANOVA or Kruskal-Wallis, based on both normality (Shapiro-Wilk) and homogeneity of variance (Levene’s test)
+
+- **Categorical variables**:
+  - Chi-squared test or Fisher’s exact test (based on expected cell counts)
+
+- **Ordinal variables** (defined via `force_ordinal`):
+  - Wilcoxon rank-sum (2 groups) or Kruskal-Wallis (3+ groups)
 
 ## 📝 Examples
 
 ### Two-level comparison
 
 ```r
-Tern2v(
+TernTable(
   data = your_data,
   group_var = "treatment_group",  # binary variable
   exclude_vars = c("ID"),
   force_ordinal = c("severity_score", "stage"),
+  group_order = c("Control", "Treatment"),  # Optional custom order
   output_xlsx = "summary_2v.xlsx",
   output_docx = "summary_2v.docx"
 )
@@ -41,7 +45,7 @@ Tern2v(
 ### Three-level comparison
 
 ```r
-Tern3v(
+TernTable(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
   exclude_vars = c("ID"),
@@ -55,11 +59,12 @@ Tern3v(
 ## 📤 Output
 
 - Returns a tibble with:
-  - Variable name
-  - Group-wise summary statistics (n (%), mean ± SD, median [IQR], etc.)
-  - p-value
+  - Variable name  
+  - Group-wise summary statistics (e.g., n (%), mean ± SD, median [IQR])  
+  - p-value  
   - Statistical test used
 - Optionally exports to `.xlsx` and `.docx`
+
 
 ## 📄 License
 

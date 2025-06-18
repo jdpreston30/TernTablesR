@@ -5,6 +5,7 @@
 demographics_i <- read_csv("synthetic_data.csv")  %>%
     mutate(
       survived = factor(survived),
+      index_group = factor(index_group),
       renal_pres = factor(renal_pres),
       AKI = if_else(survived == "N", NA_character_, AKI),
       AKI = factor(AKI),
@@ -20,21 +21,22 @@ demographics_i <- read_csv("synthetic_data.csv")  %>%
     )
 
 # Run Tern2v (2-level comparison using index_operative)
-demographics <- Tern2v(
+Tern2v <- TernTable(
   data = demographics_i,
-  exclude_vars = "ID",
-  group_var = "index_operative", # replace with your binary grouping variable
-  force_ordinal = c("grade"), # replace as needed
-  output_xlsx = "output.xlsx",
-  output_docx = "output.docx",
+  group_var = "index_operative",
+  group_order = c("Nonoperative", "Operative"),
+  exclude_vars = c("MRN", "some_other_column"),
+  force_ordinal = c("ISS", "GCS"),
+  output_xlsx = "summary_oper_vs_nonop.xlsx"
 )
 
+
 # Run Tern3v (3-level comparison using grade)
-demographics_by_grade <- Tern3v(
+Tern3v <- TernTable(
   data = demographics_i,
-  exclude_vars = "ID",
-  group_var = "grade", # grade must be 3-level numeric (e.g., 3, 4, 5)
-  force_ordinal = c("ISS", "GCS"), # add other ordinal vars here if needed
-  output_xlsx = "output_by_grade.xlsx",
-  output_docx = "output_by_grade.docx"
+  group_var = "grade",
+  group_order = c(3, 4, 5),
+  exclude_vars = c("MRN", "AAST_raw", "extra_notes"),
+  force_ordinal = c("ISS", "Age"),
+  output_docx = "tern_summary_3grade.docx"
 )
