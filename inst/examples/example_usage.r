@@ -21,7 +21,7 @@ demographics_i <- read_csv("synthetic_data.csv")  %>%
     )
 
 # Run Tern2v (2-level comparison using index_operative)
-Tern2v <- TernTable(
+Tern2v <- tern(
   data = demographics_i,
   group_var = "index_operative",
   group_order = c("Nonoperative", "Operative"),
@@ -32,7 +32,7 @@ Tern2v <- TernTable(
 
 
 # Run Tern3v (3-level comparison using grade)
-Tern3v <- TernTable(
+Tern3v <- tern(
   data = demographics_i,
   group_var = "grade",
   group_order = c(3, 4, 5),
