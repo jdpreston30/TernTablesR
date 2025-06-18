@@ -9,12 +9,9 @@ fmt_p <- function(p) {
   }
 
   if (p < 0.001) {
-    base <- signif(p, 2)
-    sci <- format(base, scientific = TRUE)
-    if (grepl("^[0-9]e", sci)) {
-      sci <- sub("([0-9])e", "\\1.0e", sci)
-    }
-    return(sci)
+  base <- signif(p, 1)
+  sci <- format(base, scientific = TRUE, digits = 1)
+  return(sci)
   }
 
   if (p >= 0.001 && p < 0.1) {
