@@ -12,7 +12,7 @@ devtools::install_github("jdpreston30/TernTablesR")
 
 ## 📦 Functions
 
-### `TernTable()`
+### `tern()`
 
 Generates summary tables for either **binary** or **3-level categorical** grouping variables. Automatically applies appropriate statistical tests based on variable type and number of groups:
 
@@ -31,7 +31,7 @@ Generates summary tables for either **binary** or **3-level categorical** groupi
 ### Two-level comparison
 
 ```r
-TernTable(
+tern(
   data = your_data,
   group_var = "treatment_group",  # binary variable
   exclude_vars = c("ID"),
@@ -45,7 +45,7 @@ TernTable(
 ### Three-level comparison
 
 ```r
-TernTable(
+tern(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
   exclude_vars = c("ID"),
@@ -72,5 +72,5 @@ MIT License
 
 ---
 
-**Developed and maintained by Josh Preston and Helen Abadiotakis.**  
+**Developed and maintained by Josh Preston and Helen Abadiotakis**  
 Feedback and contributions are welcome!
