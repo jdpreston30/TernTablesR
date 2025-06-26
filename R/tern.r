@@ -1,4 +1,4 @@
-#' Generate grouped summary table with appropriate statistical tests (2+ groups)
+#' Generate grouped or descriptive summary table with appropriate statistical tests
 #'
 #' @param data Tibble containing all variables.
 #' @param vars Character vector of variables to summarize. Defaults to all except `group_var` and `exclude_vars`.
@@ -6,9 +6,10 @@
 #' @param group_var Character, the grouping variable (factor or character with >=2 levels).
 #' @param force_ordinal Character vector of variables to treat as ordinal.
 #' @param group_order Optional vector to specify custom group level order.
+#' @param descriptive Logical; if TRUE, suppresses statistical tests and returns descriptive statistics only.
 #' @param output_xlsx Optional filename for Excel export.
 #' @param output_docx Optional filename for Word export.
-#' @return A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, p-value, and test type.
+#' @return A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value and test type.
 #' @export
 tern <- function(data,
                  vars = NULL,
@@ -16,14 +17,12 @@ tern <- function(data,
                  group_var,
                  force_ordinal = NULL,
                  group_order = NULL,
+                 descriptive = NULL,
                  output_xlsx = NULL,
                  output_docx = NULL) {
   if (is.null(vars)) {
     vars <- setdiff(names(data), unique(c(exclude_vars, group_var)))
   }
-
-  data <- data %>% filter(!is.na(.data[[group_var]]))
-
   if (!is.factor(data[[group_var]])) {
     data[[group_var]] <- factor(data[[group_var]])
   }
@@ -31,9 +30,13 @@ tern <- function(data,
     data[[group_var]] <- factor(data[[group_var]], levels = group_order)
   }
 
-  group_counts <- data %>%
-    count(.data[[group_var]]) %>%
-    deframe()
+  data <- data %>% filter(!is.na(.data[[group_var]]))
+  n_levels <- length(unique(data[[group_var]]))
+  if (is.null(descriptive)) {
+    descriptive <- n_levels < 2
+  }
+
+  group_counts <- data %>% count(.data[[group_var]]) %>% deframe()
   group_levels <- names(group_counts)
   group_labels <- setNames(
     paste0(group_levels, " (n = ", group_counts, ")"),
@@ -42,16 +45,11 @@ tern <- function(data,
 
   summarize_variable <- function(df, var) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
-    if (nrow(g) == 0) {
-      return(NULL)
-    }
+    if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
-    n_levels <- length(unique(data[[group_var]]))
 
     if (is.factor(v) || is.character(v)) {
       tab <- table(g[[group_var]], v)
-      test_type <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
-      p <- tryCatch(if (test_type == "Fisher exact") fisher.test(tab)$p.value else chisq.test(tab)$p.value, error = function(e) NA_real_)
       tab_pct <- as.data.frame.matrix(round(prop.table(tab, 1) * 100))
       tab_n <- as.data.frame.matrix(tab)
 
@@ -61,9 +59,6 @@ tern <- function(data,
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)")
         }
-        result$p <- fmt_p(p)
-        result$test <- test_type
-        return(result)
       } else {
         rows <- lapply(colnames(tab), function(level) {
           out <- tibble(Variable = paste0(var, ": ", level))
@@ -75,46 +70,48 @@ tern <- function(data,
             }
             out[[group_labels[g_lvl]]] <- val
           }
-          out$p <- fmt_p(p)
-          out$test <- test_type
-          return(out)
+          out
         })
-        return(bind_rows(rows))
+        result <- bind_rows(rows)
       }
-    } else if (!is.null(force_ordinal) && var %in% force_ordinal) {
-      stats <- g %>%
-        group_by(.data[[group_var]]) %>%
-        summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75), .groups = "drop")
+
+      if (!descriptive) {
+        test_type <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
+        p <- tryCatch(if (test_type == "Fisher exact") fisher.test(tab)$p.value else chisq.test(tab)$p.value, error = function(e) NA_real_)
+        result$p <- fmt_p(p)
+        result$test <- test_type
+      }
+      return(result)
+    }
+
+    if (!is.null(force_ordinal) && var %in% force_ordinal) {
+      stats <- g %>% group_by(.data[[group_var]]) %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75), .groups = "drop")
       result <- tibble(Variable = var)
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
         result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) paste0(val$med, " [", val$Q1, "–", val$Q3, "]") else "NA [NA–NA]"
       }
-      p <- tryCatch(
-        if (n_levels == 2) {
-          wilcox.test(g[[var]] ~ g[[group_var]])$p.value
-        } else {
-          kruskal.test(g[[var]] ~ g[[group_var]])$p.value
-        },
-        error = function(e) NA_real_
-      )
-      result$p <- fmt_p(p)
-      result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
-      return(result)
-    } else {
-      stats <- g %>%
-        group_by(.data[[group_var]]) %>%
-        summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
-      result <- tibble(Variable = var)
-      for (g_lvl in group_levels) {
-        val <- stats %>% filter(.data[[group_var]] == g_lvl)
-        result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) format_val(val$mean, val$sd) else "NA ± NA"
+      if (!descriptive) {
+        p <- tryCatch(
+          if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
+          error = function(e) NA_real_
+        )
+        result$p <- fmt_p(p)
+        result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
       }
+      return(result)
+    }
 
+    stats <- g %>% group_by(.data[[group_var]]) %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
+    result <- tibble(Variable = var)
+    for (g_lvl in group_levels) {
+      val <- stats %>% filter(.data[[group_var]] == g_lvl)
+      result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) format_val(val$mean, val$sd) else "NA ± NA"
+    }
+    if (!descriptive) {
       vals <- split(g[[var]], g[[group_var]])
       norm_check <- sapply(vals, function(x) if (length(unique(x)) > 2) shapiro.test(x)$p.value else 0)
       normal <- all(norm_check > 0.05)
-
       equal_var <- tryCatch(car::leveneTest(g[[var]] ~ g[[group_var]])$`Pr(>F)`[1] > 0.05, error = function(e) FALSE)
 
       if (n_levels == 2) {
@@ -122,20 +119,12 @@ tern <- function(data,
         p <- tryCatch(if (normal) t.test(g[[var]] ~ g[[group_var]])$p.value else wilcox.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
       } else {
         test_type <- if (normal && equal_var) "ANOVA" else "Kruskal-Wallis"
-        p <- tryCatch(
-          if (test_type == "ANOVA") {
-            summary(aov(g[[var]] ~ g[[group_var]]))[[1]][["Pr(>F)"]][1]
-          } else {
-            kruskal.test(g[[var]] ~ g[[group_var]])$p.value
-          },
-          error = function(e) NA_real_
-        )
+        p <- tryCatch(if (test_type == "ANOVA") summary(aov(g[[var]] ~ g[[group_var]]))[[1]][["Pr(>F)"]][1] else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
       }
-
       result$p <- fmt_p(p)
       result$test <- test_type
-      return(result)
     }
+    return(result)
   }
 
   out_tbl <- suppressWarnings({
