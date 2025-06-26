@@ -12,7 +12,7 @@ devtools::install_github("jdpreston30/TernTablesR")
 
 ## 📦 Functions
 
-### `tern()`
+### `ternG()`
 
 Generates summary tables for either **binary** or **3-level categorical** grouping variables. Automatically applies appropriate statistical tests based on variable type and number of groups:
 
@@ -31,7 +31,7 @@ Generates summary tables for either **binary** or **3-level categorical** groupi
 ### Two-level comparison
 
 ```r
-tern(
+ternG(
   data = your_data,
   group_var = "treatment_group",  # binary variable
   exclude_vars = c("ID"),
@@ -45,7 +45,7 @@ tern(
 ### Three-level comparison
 
 ```r
-tern(
+ternG(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
   exclude_vars = c("ID"),
@@ -56,14 +56,37 @@ tern(
 )
 ```
 
+---
+
+### `ternD()`
+
+Generates **descriptive-only** summary tables without group comparisons. Useful for baseline cohort description or single-group studies.
+
+- **Continuous variables**: Mean ± SD  
+- **Ordinal variables** (defined via `force_ordinal`): Median [IQR]  
+- **Categorical variables**: Counts (%)
+
+## 📝 Example
+
+```r
+ternD(
+  data = your_data,
+  exclude_vars = c("ID"),
+  force_ordinal = c("severity_score", "stage"),
+  output_xlsx = "summary_descriptive.xlsx",
+  output_docx = "summary_descriptive.docx"
+)
+```
+
+---
+
 ## 📤 Output
 
 - Returns a tibble with:
   - Variable name  
-  - Group-wise summary statistics (e.g., n (%), mean ± SD, median [IQR])  
-  - p-value  
-  - Statistical test used
-- Optionally exports to `.xlsx` and `.docx`
+  - Summary statistics (per group if using `ternG()`, single overall row if using `ternD()`)  
+  - p-value and test name (`ternG()` only)
+- Optionally exports to `.xlsx` and `.docx` files.
 
 
 ## 📄 License
