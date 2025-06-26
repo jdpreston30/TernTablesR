@@ -11,7 +11,7 @@
 #' @param output_docx Optional filename for Word export.
 #' @return A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value and test type.
 #' @export
-tern <- function(data,
+ternG <- function(data,
                  vars = NULL,
                  exclude_vars = NULL,
                  group_var,
