@@ -3,5 +3,6 @@
 export(export_to_word)
 export(fmt_p)
 export(format_val)
+export(tern)
 export(ternD)
 export(ternG)

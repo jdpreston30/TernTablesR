@@ -13,7 +13,8 @@ ternG(
   group_order = NULL,
   descriptive = NULL,
   output_xlsx = NULL,
-  output_docx = NULL
+  output_docx = NULL,
+  OR_col = FALSE
 )
 }
 \arguments{
@@ -34,9 +35,11 @@ ternG(
 \item{output_xlsx}{Optional filename for Excel export.}
 
 \item{output_docx}{Optional filename for Word export.}
+
+\item{OR_col}{Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.}
 }
 \value{
-A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value and test type.
+A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value, test type, and odds ratio.
 }
 \description{
 Generate grouped or descriptive summary table with appropriate statistical tests

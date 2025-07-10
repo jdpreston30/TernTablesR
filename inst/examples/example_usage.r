@@ -2,7 +2,7 @@
 # Requires synthetic_data.csv located in inst/examples/
 
 # Import and structure data
-demographics_i <- read_csv("synthetic_data.csv")  %>%
+demographics_i <- read_csv("inst/examples/synthetic_data.csv")  %>%
     mutate(
       survived = factor(survived),
       index_group = factor(index_group),
@@ -20,23 +20,26 @@ demographics_i <- read_csv("synthetic_data.csv")  %>%
       Age = as.integer(Age)
     )
 
-# Run Tern2v (2-level comparison using index_operative)
-Tern2v <- tern(
+# Run TernG (2-level comparison using index_operative)
+Tern2v <- ternG(
   data = demographics_i,
+  exclude_vars = c("ID"),
   group_var = "index_operative",
-  group_order = c("Nonoperative", "Operative"),
-  exclude_vars = c("MRN", "some_other_column"),
   force_ordinal = c("ISS", "GCS"),
-  output_xlsx = "summary_oper_vs_nonop.xlsx"
+  group_order = c("Nonoperative", "Operative"),
+  output_xlsx = "summary_oper_vs_nonop.xlsx",
+  output_docx = "summary_oper_vs_nonop.docx",
+  OR_col = TRUE
 )
 
-
-# Run Tern3v (3-level comparison using grade)
-Tern3v <- tern(
+# Run TernG (3-level comparison using grade)
+Tern3v <- ternG(
   data = demographics_i,
+  exclude_vars = c("ID"),
   group_var = "grade",
-  group_order = c(3, 4, 5),
-  exclude_vars = c("MRN", "AAST_raw", "extra_notes"),
   force_ordinal = c("ISS", "Age"),
-  output_docx = "tern_summary_3grade.docx"
+  group_order = c(3, 4, 5),
+  output_xlsx = "tern_summary_3grade.xlsx",
+  output_docx = "tern_summary_3grade.docx",
+  OR_col = FALSE
 )

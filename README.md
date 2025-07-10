@@ -31,6 +31,7 @@ Generates summary tables for either **binary** or **3-level categorical** groupi
 ### Two-level comparison
 
 ```r
+library(TernTablesR)
 ternG(
   data = your_data,
   group_var = "treatment_group",  # binary variable
@@ -38,13 +39,15 @@ ternG(
   force_ordinal = c("severity_score", "stage"),
   group_order = c("Control", "Treatment"),  # Optional custom order
   output_xlsx = "summary_2v.xlsx",
-  output_docx = "summary_2v.docx"
+  output_docx = "summary_2v.docx",
+  OR_col = TRUE,  # Adds odds ratios for 2x2 categorical comparisons
 )
 ```
 
 ### Three-level comparison
 
 ```r
+library(TernTablesR)
 ternG(
   data = your_data,
   group_var = "grade",  # 3-level variable (e.g., 3, 4, 5)
@@ -86,12 +89,15 @@ ternD(
   - Variable name  
   - Summary statistics (per group if using `ternG()`, single overall row if using `ternD()`)  
   - p-value and test name (`ternG()` only)
+  - Odds ratios with 95% confidence intervals (for Chi squared and Fisher's) (Optional via OR_col argument)
 - Optionally exports to `.xlsx` and `.docx` files.
 
 
 ## 📄 License
 
-MIT License
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+This project is licensed under the MIT License.
 
 ---
 
