@@ -10,7 +10,7 @@
 #' @param output_xlsx Optional filename for Excel export.
 #' @param output_docx Optional filename for Word export.
 #' @param OR_col Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.
-#' @return A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value, test type, and odds ratio.
+#' @return A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value, test type, odds ratio, and total.
 #' @export
 ternG <- function(data,
                   vars = NULL,
@@ -64,6 +64,14 @@ ternG <- function(data,
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)")
         }
+        result$p <- fmt_p(tryCatch(if (any(tab < 5)) fisher.test(tab)$p.value else chisq.test(tab)$p.value, error = function(e) NA_real_))
+        result$test <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
+        if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
+          or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
+          result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2, 1], or_obj[2, 2], or_obj[2, 3]) else NA_character_
+        } else if (OR_col) {
+          result$OR <- NA_character_
+        }
         if (descriptive) {
           result$Total <- paste0(tab_total_n[ref_level], " (", tab_total_pct[ref_level], "%)")
         }
@@ -78,28 +86,15 @@ ternG <- function(data,
             }
             out[[group_labels[g_lvl]]] <- val
           }
+          out$p <- fmt_p(tryCatch(if (any(tab < 5)) fisher.test(tab)$p.value else chisq.test(tab)$p.value, error = function(e) NA_real_))
+          out$test <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
+          if (OR_col) out$OR <- NA_character_
           if (descriptive) {
             out$Total <- paste0(tab_total_n[level], " (", tab_total_pct[level], "%)")
           }
           out
         })
         result <- bind_rows(rows)
-      }
-
-      if (!descriptive) {
-        test_type <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
-        p <- tryCatch(if (test_type == "Fisher exact") fisher.test(tab)$p.value else chisq.test(tab)$p.value, error = function(e) NA_real_)
-        result$p <- fmt_p(p)
-        result$test <- test_type
-
-        if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
-          or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-          result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2, 1], or_obj[2, 2], or_obj[2, 3]) else NA_character_
-        } else if (OR_col) {
-          result$OR <- NA_character_
-        }
-      } else if (OR_col) {
-        result$OR <- NA_character_
       }
       return(result)
     }
@@ -111,16 +106,14 @@ ternG <- function(data,
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
         result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) paste0(val$med, " [", val$Q1, "–", val$Q3, "]") else "NA [NA–NA]"
       }
+      p <- tryCatch(if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
+      result$p <- fmt_p(p)
+      result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
+      if (OR_col) result$OR <- NA_character_
       if (descriptive) {
         val_total <- g %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75))
         result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
       }
-      if (!descriptive) {
-        p <- tryCatch(if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
-        result$p <- fmt_p(p)
-        result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
-      }
-      if (OR_col) result$OR <- NA_character_
       return(result)
     }
 
@@ -130,27 +123,25 @@ ternG <- function(data,
       val <- stats %>% filter(.data[[group_var]] == g_lvl)
       result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) format_val(val$mean, val$sd) else "NA ± NA"
     }
+    vals <- split(g[[var]], g[[group_var]])
+    norm_check <- sapply(vals, function(x) if (length(unique(x)) > 2) shapiro.test(x)$p.value else 0)
+    normal <- all(norm_check > 0.05)
+    equal_var <- tryCatch(car::leveneTest(g[[var]] ~ g[[group_var]])$`Pr(>F)`[1] > 0.05, error = function(e) FALSE)
+
+    if (n_levels == 2) {
+      test_type <- if (normal) "Welch t-test" else "Wilcoxon rank-sum"
+      p <- tryCatch(if (normal) t.test(g[[var]] ~ g[[group_var]])$p.value else wilcox.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
+    } else {
+      test_type <- if (normal && equal_var) "ANOVA" else "Kruskal-Wallis"
+      p <- tryCatch(if (test_type == "ANOVA") summary(aov(g[[var]] ~ g[[group_var]]))[[1]][["Pr(>F)"]][1] else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
+    }
+    result$p <- fmt_p(p)
+    result$test <- test_type
+    if (OR_col) result$OR <- NA_character_
     if (descriptive) {
       val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
       result$Total <- format_val(val_total$mean, val_total$sd)
     }
-    if (!descriptive) {
-      vals <- split(g[[var]], g[[group_var]])
-      norm_check <- sapply(vals, function(x) if (length(unique(x)) > 2) shapiro.test(x)$p.value else 0)
-      normal <- all(norm_check > 0.05)
-      equal_var <- tryCatch(car::leveneTest(g[[var]] ~ g[[group_var]])$`Pr(>F)`[1] > 0.05, error = function(e) FALSE)
-
-      if (n_levels == 2) {
-        test_type <- if (normal) "Welch t-test" else "Wilcoxon rank-sum"
-        p <- tryCatch(if (normal) t.test(g[[var]] ~ g[[group_var]])$p.value else wilcox.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
-      } else {
-        test_type <- if (normal && equal_var) "ANOVA" else "Kruskal-Wallis"
-        p <- tryCatch(if (test_type == "ANOVA") summary(aov(g[[var]] ~ g[[group_var]]))[[1]][["Pr(>F)"]][1] else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
-      }
-      result$p <- fmt_p(p)
-      result$test <- test_type
-    }
-    if (OR_col) result$OR <- NA_character_
     return(result)
   }
 
