@@ -6,7 +6,7 @@
 #' @param group_var Character, the grouping variable (factor or character with >=2 levels).
 #' @param force_ordinal Character vector of variables to treat as ordinal.
 #' @param group_order Optional vector to specify custom group level order.
-#' @param descriptive Logical; if TRUE, suppresses statistical tests and returns descriptive statistics only.
+#' @param descriptive Logical; if TRUE, adds a Total column with population-level summaries.
 #' @param output_xlsx Optional filename for Excel export.
 #' @param output_docx Optional filename for Word export.
 #' @param OR_col Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.
@@ -38,9 +38,7 @@ ternG <- function(data,
     descriptive <- n_levels < 2
   }
 
-  group_counts <- data %>%
-    count(.data[[group_var]]) %>%
-    deframe()
+  group_counts <- data %>% count(.data[[group_var]]) %>% deframe()
   group_levels <- names(group_counts)
   group_labels <- setNames(
     paste0(group_levels, " (n = ", group_counts, ")"),
@@ -49,9 +47,7 @@ ternG <- function(data,
 
   summarize_variable <- function(df, var) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
-    if (nrow(g) == 0) {
-      return(NULL)
-    }
+    if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
 
     if (is.factor(v) || is.character(v)) {
@@ -59,12 +55,17 @@ ternG <- function(data,
       tab_pct <- as.data.frame.matrix(round(prop.table(tab, 1) * 100))
       tab_n <- as.data.frame.matrix(tab)
 
-      result <- NULL
+      tab_total_n <- colSums(tab)
+      tab_total_pct <- round(prop.table(tab_total_n) * 100)
+
       if (ncol(tab) == 2) {
         ref_level <- if (all(c("Y", "N") %in% colnames(tab))) "Y" else names(sort(colSums(tab), decreasing = TRUE))[1]
         result <- tibble(Variable = paste0(var, ": ", ref_level))
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)")
+        }
+        if (descriptive) {
+          result$Total <- paste0(tab_total_n[ref_level], " (", tab_total_pct[ref_level], "%)")
         }
       } else {
         rows <- lapply(colnames(tab), function(level) {
@@ -76,6 +77,9 @@ ternG <- function(data,
               "NA (NA%)"
             }
             out[[group_labels[g_lvl]]] <- val
+          }
+          if (descriptive) {
+            out$Total <- paste0(tab_total_n[level], " (", tab_total_pct[level], "%)")
           }
           out
         })
@@ -89,15 +93,8 @@ ternG <- function(data,
         result$test <- test_type
 
         if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
-          or_obj <- tryCatch(
-            epitools::oddsratio(tab, method = "wald")$measure,
-            error = function(e) NULL
-          )
-          result$OR <- if (!is.null(or_obj)) {
-            sprintf("%.2f [%.2f–%.2f]", or_obj[2, 1], or_obj[2, 2], or_obj[2, 3])
-          } else {
-            NA_character_
-          }
+          or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
+          result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2, 1], or_obj[2, 2], or_obj[2, 3]) else NA_character_
         } else if (OR_col) {
           result$OR <- NA_character_
         }
@@ -108,19 +105,18 @@ ternG <- function(data,
     }
 
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
-      stats <- g %>%
-        group_by(.data[[group_var]]) %>%
-        summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75), .groups = "drop")
+      stats <- g %>% group_by(.data[[group_var]]) %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75), .groups = "drop")
       result <- tibble(Variable = var)
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
         result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) paste0(val$med, " [", val$Q1, "–", val$Q3, "]") else "NA [NA–NA]"
       }
+      if (descriptive) {
+        val_total <- g %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75))
+        result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
+      }
       if (!descriptive) {
-        p <- tryCatch(
-          if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
-          error = function(e) NA_real_
-        )
+        p <- tryCatch(if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
         result$p <- fmt_p(p)
         result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
       }
@@ -128,13 +124,15 @@ ternG <- function(data,
       return(result)
     }
 
-    stats <- g %>%
-      group_by(.data[[group_var]]) %>%
-      summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
+    stats <- g %>% group_by(.data[[group_var]]) %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
     result <- tibble(Variable = var)
     for (g_lvl in group_levels) {
       val <- stats %>% filter(.data[[group_var]] == g_lvl)
       result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) format_val(val$mean, val$sd) else "NA ± NA"
+    }
+    if (descriptive) {
+      val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
+      result$Total <- format_val(val_total$mean, val_total$sd)
     }
     if (!descriptive) {
       vals <- split(g[[var]], g[[group_var]])
