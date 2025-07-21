@@ -100,50 +100,43 @@ ternG <- function(data,
     }
 
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
-      stats <- g %>% group_by(.data[[group_var]]) %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75), .groups = "drop")
+      stats <- g %>%
+        group_by(.data[[group_var]]) %>%
+        summarise(
+          Q1  = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 0),
+          med = round(median(.data[[var]], na.rm = TRUE), 0),
+          Q3  = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 0),
+          .groups = "drop"
+        )
+    
       result <- tibble(Variable = var)
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
-        result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) paste0(val$med, " [", val$Q1, "–", val$Q3, "]") else "NA [NA–NA]"
+        result[[group_labels[g_lvl]]] <- if (nrow(val) == 1)
+          paste0(val$med, " [", val$Q1, "–", val$Q3, "]") else "NA [NA–NA]"
       }
-      p <- tryCatch(if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
+    
+      p <- tryCatch(
+        if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value
+        else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
+        error = function(e) NA_real_
+      )
+    
       result$p <- fmt_p(p)
       result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
       if (OR_col) result$OR <- NA_character_
+    
       if (descriptive) {
-        val_total <- g %>% summarise(Q1 = quantile(.data[[var]], 0.25), med = median(.data[[var]]), Q3 = quantile(.data[[var]], 0.75))
+        val_total <- g %>%
+          summarise(
+            Q1  = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 0),
+            med = round(median(.data[[var]], na.rm = TRUE), 0),
+            Q3  = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 0)
+          )
         result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
       }
       return(result)
     }
-
-    stats <- g %>% group_by(.data[[group_var]]) %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
-    result <- tibble(Variable = var)
-    for (g_lvl in group_levels) {
-      val <- stats %>% filter(.data[[group_var]] == g_lvl)
-      result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) format_val(val$mean, val$sd) else "NA ± NA"
-    }
-    vals <- split(g[[var]], g[[group_var]])
-    norm_check <- sapply(vals, function(x) if (length(unique(x)) > 2) shapiro.test(x)$p.value else 0)
-    normal <- all(norm_check > 0.05)
-    equal_var <- tryCatch(car::leveneTest(g[[var]] ~ g[[group_var]])$`Pr(>F)`[1] > 0.05, error = function(e) FALSE)
-
-    if (n_levels == 2) {
-      test_type <- if (normal) "Welch t-test" else "Wilcoxon rank-sum"
-      p <- tryCatch(if (normal) t.test(g[[var]] ~ g[[group_var]])$p.value else wilcox.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
-    } else {
-      test_type <- if (normal && equal_var) "ANOVA" else "Kruskal-Wallis"
-      p <- tryCatch(if (test_type == "ANOVA") summary(aov(g[[var]] ~ g[[group_var]]))[[1]][["Pr(>F)"]][1] else kruskal.test(g[[var]] ~ g[[group_var]])$p.value, error = function(e) NA_real_)
-    }
-    result$p <- fmt_p(p)
-    result$test <- test_type
-    if (OR_col) result$OR <- NA_character_
-    if (descriptive) {
-      val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
-      result$Total <- format_val(val_total$mean, val_total$sd)
-    }
-    return(result)
-  }
 
   out_tbl <- suppressWarnings({
     result <- bind_rows(lapply(vars, function(v) summarize_variable(data, v)))
