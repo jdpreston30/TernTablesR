@@ -14,6 +14,7 @@ ternG(
   descriptive = NULL,
   output_xlsx = NULL,
   output_docx = NULL,
+  OR_method = "dynamic",
   OR_col = FALSE,
   consider_normality = TRUE,
   print_normality = FALSE
@@ -37,6 +38,8 @@ ternG(
 \item{output_xlsx}{Optional filename for Excel export.}
 
 \item{output_docx}{Optional filename for Word export.}
+
+\item{OR_method}{Logical; if "dynamic", OR computed with Wald when Chi-square used and Fisher when Fisher used. If "wald" then forces Wald method for all ORs.}
 
 \item{OR_col}{Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.}
 
