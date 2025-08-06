@@ -41,6 +41,7 @@ ternG(
   output_xlsx = "summary_2v.xlsx",
   output_docx = "summary_2v.docx",
   OR_col = TRUE,  # Adds odds ratios for 2x2 categorical comparisons
+  consider_normality = TRUE # Runs normality test to choose test to compare means (default)
 )
 ```
 
