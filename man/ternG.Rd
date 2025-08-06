@@ -15,7 +15,8 @@ ternG(
   output_xlsx = NULL,
   output_docx = NULL,
   OR_col = FALSE,
-  consider_normality = TRUE
+  consider_normality = TRUE,
+  print_normality = FALSE
 )
 }
 \arguments{
@@ -40,6 +41,8 @@ ternG(
 \item{OR_col}{Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.}
 
 \item{consider_normality}{Logical; if TRUE, adds dynamically chooses test to compare values based on normality test (default). If FALSE, just uses t-test.}
+
+\item{print_normality}{Logical; if TRUE, adds Shapiro-Wilk p-value onto output table.}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value, test type, and odds ratio.
