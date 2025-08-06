@@ -8,6 +8,7 @@ ternG <- function(data,
                   output_xlsx = NULL,
                   output_docx = NULL,
                   OR_col = FALSE,
+                  OR_method = "dynamic",
                   consider_normality = TRUE,
                   print_normality = FALSE) {
 
@@ -55,17 +56,35 @@ ternG <- function(data,
             tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)"
           )
         }
+
+        fisher_flag <- any(tab < 5)
         result$p <- fmt_p(tryCatch(
-          if (any(tab < 5)) fisher.test(tab)$p.value else chisq.test(tab)$p.value,
+          if (fisher_flag) fisher.test(tab)$p.value else chisq.test(tab)$p.value,
           error = function(e) NA_real_
         ))
-        result$test <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
+        result$test <- if (fisher_flag) "Fisher exact" else "Chi-squared"
+
         if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
-          or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-          result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else NA_character_
+          if (OR_method == "dynamic") {
+            if (fisher_flag) {
+              fisher_obj <- fisher.test(tab)
+              result$OR <- sprintf("%.2f [%.2f–%.2f]", fisher_obj$estimate, fisher_obj$conf.int[1], fisher_obj$conf.int[2])
+              result$OR_method <- "Fisher"
+            } else {
+              or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
+              result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else NA_character_
+              result$OR_method <- "Wald"
+            }
+          } else if (OR_method == "wald") {
+            or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
+            result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else NA_character_
+            result$OR_method <- "Wald"
+          }
         } else if (OR_col) {
           result$OR <- NA_character_
+          result$OR_method <- NA_character_
         }
+
         if (descriptive) {
           result$Total <- paste0(tab_total_n[ref_level], " (", tab_total_pct[ref_level], "%)")
         }
@@ -85,7 +104,10 @@ ternG <- function(data,
             error = function(e) NA_real_
           ))
           out$test <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
-          if (OR_col) out$OR <- NA_character_
+          if (OR_col) {
+            out$OR <- NA_character_
+            out$OR_method <- NA_character_
+          }
           if (descriptive) {
             out$Total <- paste0(tab_total_n[level], " (", tab_total_pct[level], "%)")
           }
