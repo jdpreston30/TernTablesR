@@ -23,7 +23,6 @@ ternG <- function(data,
   }
 
   data <- data %>% filter(!is.na(.data[[group_var]]))
-
   n_levels <- length(unique(data[[group_var]]))
   if (is.null(descriptive)) descriptive <- n_levels < 2
 
@@ -34,14 +33,15 @@ ternG <- function(data,
     group_levels
   )
 
-  summarize_variable <- function(df, var) {
+  .summarize_var_internal <- function(df, var, force_ordinal = NULL) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
     if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
 
-    # Categorical
-    if (is.factor(v) || is.character(v)) {
-      tab <- table(g[[group_var]], v)
+    # ----- Categorical -----
+    if (is.character(v) || is.factor(v)) {
+      g[[var]] <- factor(g[[var]])
+      tab <- table(g[[group_var]], g[[var]])
       tab_pct <- as.data.frame.matrix(round(prop.table(tab, 1) * 100))
       tab_n   <- as.data.frame.matrix(tab)
       tab_total_n   <- colSums(tab)
@@ -96,7 +96,7 @@ ternG <- function(data,
       return(result)
     }
 
-    # Ordinal forced
+    # ----- Force ordinal -----
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
       stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
         Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
@@ -137,7 +137,7 @@ ternG <- function(data,
       return(result)
     }
 
-    # Consider normality
+    # ----- Normality assessment -----
     sw_p_all <- list()
     is_normal <- TRUE
     if (isTRUE(consider_normality)) {
@@ -149,42 +149,14 @@ ternG <- function(data,
         })
         do.call(c, out)
       }, error = function(e) rep(NA, n_levels))
-
       is_normal <- all(sw_p_all > 0.05, na.rm = TRUE)
-      if (!is_normal) {
-        stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
-          Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
-          med = round(median(.data[[var]], na.rm = TRUE), 1),
-          Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1), .groups = "drop")
-        result <- tibble(Variable = var)
-        for (g_lvl in group_levels) {
-          val <- stats %>% filter(.data[[group_var]] == g_lvl)
-          result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) {
-            paste0(val$med, " [", val$Q1, "–", val$Q3, "]")
-          } else {
-            "NA [NA–NA]"
-          }
-        }
-        p <- tryCatch(
-          if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value
-          else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
-          error = function(e) NA_real_
-        )
-        result$p <- fmt_p(p)
-        result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
-        if (OR_col) result$OR <- NA_character_
-        if (descriptive) {
-          val_total <- g %>% summarise(Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
-                                       med = round(median(.data[[var]], na.rm = TRUE), 1),
-                                       Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1))
-          result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
-        }
-        if (print_normality) result$SW_p <- if (!is.na(sw_p)) formatC(sw_p, format = "f", digits = 4) else NA_character_
-        return(result)
-      }
-      }
     }
 
+    if (!is_normal) {
+      return(.summarize_var_internal(df, var = var, force_ordinal = var))
+    }
+
+    # ----- Normally distributed numeric -----
     stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
       mean = mean(.data[[var]], na.rm = TRUE),
       sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
@@ -221,7 +193,7 @@ ternG <- function(data,
   }
 
   out_tbl <- suppressWarnings({
-    result <- bind_rows(lapply(vars, function(v) summarize_variable(data, v)))
+    result <- bind_rows(lapply(vars, function(v) .summarize_var_internal(data, v, force_ordinal)))
     message("Note: Categorical variables with >2 levels return multiple rows.")
     result
   })
