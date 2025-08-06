@@ -36,7 +36,11 @@ fmt_p <- function(p) {
 #' @return Formatted string "mean ± sd"
 #' @export
 format_val <- function(mean, sd) {
-  paste0(round(mean, 1), " ± ", round(sd, 1))
+  paste0(
+    formatC(mean, format = "f", digits = 1),
+    " ± ",
+    formatC(sd, format = "f", digits = 1)
+  )
 }
 
 export_to_excel <- function(tbl, filename) {
