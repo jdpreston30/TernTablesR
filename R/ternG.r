@@ -152,7 +152,36 @@ ternG <- function(data,
 
       is_normal <- all(sw_p_all > 0.05, na.rm = TRUE)
       if (!is_normal) {
-        return(summarize_variable(df, var = force_ordinal <- var))
+        stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
+          Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
+          med = round(median(.data[[var]], na.rm = TRUE), 1),
+          Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1), .groups = "drop")
+        result <- tibble(Variable = var)
+        for (g_lvl in group_levels) {
+          val <- stats %>% filter(.data[[group_var]] == g_lvl)
+          result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) {
+            paste0(val$med, " [", val$Q1, "–", val$Q3, "]")
+          } else {
+            "NA [NA–NA]"
+          }
+        }
+        p <- tryCatch(
+          if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value
+          else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
+          error = function(e) NA_real_
+        )
+        result$p <- fmt_p(p)
+        result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
+        if (OR_col) result$OR <- NA_character_
+        if (descriptive) {
+          val_total <- g %>% summarise(Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
+                                       med = round(median(.data[[var]], na.rm = TRUE), 1),
+                                       Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1))
+          result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
+        }
+        if (print_normality) result$SW_p <- if (!is.na(sw_p)) formatC(sw_p, format = "f", digits = 4) else NA_character_
+        return(result)
+      }
       }
     }
 
