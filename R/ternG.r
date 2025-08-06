@@ -125,23 +125,32 @@ ternG <- function(data,
                                      Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1))
         result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
       }
-      if (print_normality) result$SW_p <- NA_character_
+      if (print_normality) {
+        for (g_lvl in group_levels) {
+          sw_p <- tryCatch({
+            x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
+            if (length(x) >= 3) shapiro.test(x)$p.value else NA_real_
+          }, error = function(e) NA_real_)
+          result[[paste0("SW_p_", g_lvl)]] <- formatC(sw_p, format = "f", digits = 4)
+        }
+      }
       return(result)
     }
 
     # Consider normality
-    sw_p <- NA_real_
+    sw_p_all <- list()
     is_normal <- TRUE
     if (isTRUE(consider_normality)) {
-      sw_tests <- tryCatch({
-        by(g[[var]], g[[group_var]], function(x) {
-          if (length(x) >= 3) shapiro.test(x)$p.value else NA
+      sw_p_all <- tryCatch({
+        out <- lapply(group_levels, function(g_lvl) {
+          x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
+          pval <- if (length(x) >= 3) shapiro.test(x)$p.value else NA_real_
+          setNames(pval, paste0("SW_p_", g_lvl))
         })
+        do.call(c, out)
       }, error = function(e) rep(NA, n_levels))
 
-      sw_p <- min(unlist(sw_tests), na.rm = TRUE)
-      is_normal <- !is.na(sw_p) && sw_p > 0.05
-
+      is_normal <- all(sw_p_all > 0.05, na.rm = TRUE)
       if (!is_normal) {
         return(summarize_variable(df, var = force_ordinal <- var))
       }
@@ -174,8 +183,11 @@ ternG <- function(data,
       val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
       result$Total <- paste0(round(val_total$mean, 1), " ± ", round(val_total$sd, 1))
     }
-    if (print_normality) result$SW_p <- if (!is.na(sw_p)) formatC(sw_p, format = "f", digits = 4) else NA_character_
-
+    if (print_normality && length(sw_p_all) > 0) {
+      for (nm in names(sw_p_all)) {
+        result[[nm]] <- formatC(sw_p_all[[nm]], format = "f", digits = 4)
+      }
+    }
     return(result)
   }
 
