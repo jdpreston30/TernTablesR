@@ -23,33 +23,36 @@ ternG(
 \arguments{
 \item{data}{Tibble containing all variables.}
 
-\item{vars}{Character vector of variables to summarize. Defaults to all except `group_var` and `exclude_vars`.}
+\item{vars}{Character vector of variables to summarize. Defaults to all except \code{group_var} and \code{exclude_vars}.}
 
-\item{exclude_vars}{Character vector of variable(s) to exclude. `group_var` is automatically excluded.}
+\item{exclude_vars}{Character vector of variable(s) to exclude. \code{group_var} is automatically excluded.}
 
-\item{group_var}{Character, the grouping variable (factor or character with >=2 levels).}
+\item{group_var}{Character, the grouping variable (factor or character with ≥2 levels).}
 
-\item{force_ordinal}{Character vector of variables to treat as ordinal.}
+\item{force_ordinal}{Character vector of variables to treat as ordinal (i.e., use medians/IQR and nonparametric tests).}
 
-\item{group_order}{Optional vector to specify custom group level order.}
+\item{group_order}{Optional character vector to specify a custom group level order.}
 
-\item{descriptive}{Logical; if TRUE, suppresses statistical tests and returns descriptive statistics only.}
+\item{descriptive}{Logical; if \code{TRUE}, suppresses statistical tests and returns descriptive statistics only.}
 
-\item{output_xlsx}{Optional filename for Excel export.}
+\item{output_xlsx}{Optional filename to export the table as an Excel file.}
 
-\item{output_docx}{Optional filename for Word export.}
+\item{output_docx}{Optional filename to export the table as a Word document.}
 
-\item{OR_col}{Logical; if TRUE, adds Odds Ratios for 2-level categorical variables.}
+\item{OR_col}{Logical; if \code{TRUE}, adds odds ratios for 2-level categorical variables.}
 
-\item{OR_method}{Logical; if "dynamic", OR computed with Wald when Chi-square used and Fisher when Fisher used. If "wald" then forces Wald method for all ORs.}
+\item{OR_method}{Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.}
 
-\item{consider_normality}{Logical; if TRUE, adds dynamically chooses test to compare values based on normality test (default). If FALSE, just uses t-test.}
+\item{consider_normality}{Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.}
 
-\item{print_normality}{Logical; if TRUE, adds Shapiro-Wilk p-value onto output table.}
+\item{print_normality}{Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.}
 }
 \value{
-A tibble with one row per variable (multi-row for multi-level factors), summary statistics by group, and optionally p-value, test type, and odds ratio.
+A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
+p-values, test type, and optionally odds ratios and total summary column.
 }
 \description{
-Generate grouped or descriptive summary table with appropriate statistical tests
+Creates a grouped or ungrouped summary table, with optional statistical testing
+for group comparisons. Supports numeric, ordinal, and categorical variables, and
+includes options to calculate p-values and odds ratios.
 }

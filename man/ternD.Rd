@@ -24,7 +24,7 @@ ternD(
 \item{output_docx}{Optional filename for Word export.}
 }
 \value{
-A tibble with one row per variable (multi-row for multi-level factors), summary statistics, NA p-value and test type as "Descriptive".
+A tibble with one row per variable (multi-row for multi-level factors), summary statistics across appropriate columns.
 }
 \description{
 Generate descriptive summary table without grouping

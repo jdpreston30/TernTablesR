@@ -1,3 +1,27 @@
+#' Generate grouped or descriptive summary table with appropriate statistical tests
+#'
+#' Creates a grouped or ungrouped summary table, with optional statistical testing
+#' for group comparisons. Supports numeric, ordinal, and categorical variables, and
+#' includes options to calculate p-values and odds ratios.
+#'
+#' @param data Tibble containing all variables.
+#' @param vars Character vector of variables to summarize. Defaults to all except \code{group_var} and \code{exclude_vars}.
+#' @param exclude_vars Character vector of variable(s) to exclude. \code{group_var} is automatically excluded.
+#' @param group_var Character, the grouping variable (factor or character with ≥2 levels).
+#' @param force_ordinal Character vector of variables to treat as ordinal (i.e., use medians/IQR and nonparametric tests).
+#' @param group_order Optional character vector to specify a custom group level order.
+#' @param descriptive Logical; if \code{TRUE}, suppresses statistical tests and returns descriptive statistics only.
+#' @param output_xlsx Optional filename to export the table as an Excel file.
+#' @param output_docx Optional filename to export the table as a Word document.
+#' @param OR_col Logical; if \code{TRUE}, adds odds ratios for 2-level categorical variables.
+#' @param OR_method Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.
+#' @param consider_normality Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.
+#' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.
+#'
+#' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
+#' p-values, test type, and optionally odds ratios and total summary column.
+#'
+#' @export
 ternG <- function(data,
                   vars = NULL,
                   exclude_vars = NULL,
