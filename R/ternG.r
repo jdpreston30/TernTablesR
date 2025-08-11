@@ -243,6 +243,39 @@ ternG <- function(data,
     message("Note: Categorical variables with >2 levels return multiple rows.")
     result
   })
+                        
+  # -- Standardize group headers and enforce final column order (level-agnostic)
+
+  # 1) Build a rename map from the labels you created (e.g., "Alive (n = 40)")
+  #    to the plain level names (e.g., "Alive"), but only for columns that exist.
+  clean_count_suffix <- function(nm) sub("\\s*\\(n\\s*=\\s*\\d+\\)\\s*$", "", nm)
+
+  # Vector of original group-labeled column names in the table
+  orig_group_cols <- unname(group_labels) # e.g., "Y (n = 34)", "N (n = 32)", or other levels
+  orig_group_cols <- intersect(orig_group_cols, names(out_tbl))
+
+  # Corresponding clean names (use the actual level names from names(group_labels))
+  clean_group_names <- clean_count_suffix(orig_group_cols) # or: names(group_labels)[match(orig_group_cols, unname(group_labels))]
+
+  # rename() needs new = old
+  if (length(orig_group_cols)) {
+    rename_map <- stats::setNames(orig_group_cols, clean_group_names)
+    out_tbl <- dplyr::rename(out_tbl, !!!rename_map)
+  }
+
+  # 2) Determine the final order of the group columns based on group_levels (any number of levels)
+  #    Keep only those group levels that actually made it into out_tbl
+  desired_group_cols <- intersect(group_levels, names(out_tbl))
+
+  # 3) Collect any normality cols
+  normality_cols <- grep("^SW_p_", names(out_tbl), value = TRUE)
+
+  # 4) Desired column order (level-agnostic)
+  desired <- c("Variable", desired_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
+
+  # 5) Reorder: put desired first (when they exist), then everything else
+  out_tbl <- dplyr::select(out_tbl, dplyr::any_of(desired), dplyr::everything())
+                        
 
   if (!is.null(output_xlsx)) export_to_excel(out_tbl, output_xlsx)
   if (!is.null(output_docx)) export_to_word(out_tbl, output_docx)
