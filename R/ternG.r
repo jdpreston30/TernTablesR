@@ -72,6 +72,29 @@ ternG <- function(data,
       tab_total_n   <- colSums(tab)
       tab_total_pct <- round(prop.table(tab_total_n) * 100)
 
+      # Calculate p-value once for the entire contingency table (not per level)
+      fisher_flag <- any(tab < 5)
+      test_result <- tryCatch({
+        if (fisher_flag) {
+          list(p_value = stats::fisher.test(tab)$p.value, test_name = "Fisher exact", error = NULL)
+        } else {
+          list(p_value = stats::chisq.test(tab)$p.value, test_name = "Chi-squared", error = NULL)
+        }
+      }, error = function(e) {
+        # Determine the reason for failure
+        if (nrow(tab) < 2 || ncol(tab) < 2) {
+          reason <- "insufficient variation"
+        } else if (sum(tab) == 0) {
+          reason <- "no observations"
+        } else if (any(rowSums(tab) == 0) || any(colSums(tab) == 0)) {
+          reason <- "empty cells"
+        } else {
+          reason <- "test failure"
+        }
+        list(p_value = NA_real_, test_name = if (fisher_flag) "Fisher exact" else "Chi-squared", 
+             error = reason)
+      })
+      
       if (ncol(tab) == 2) {
         ref_level <- if (all(c("Y", "N") %in% colnames(tab))) "Y" else names(sort(colSums(tab), decreasing = TRUE))[1]
         result <- tibble(Variable = paste0(var, ": ", ref_level))
@@ -81,27 +104,32 @@ ternG <- function(data,
           )
         }
 
-        fisher_flag <- any(tab < 5)
-        result$p <- fmt_p(tryCatch(
-          if (fisher_flag) fisher.test(tab)$p.value else chisq.test(tab)$p.value,
-          error = function(e) NA_real_
-        ))
-        result$test <- if (fisher_flag) "Fisher exact" else "Chi-squared"
+        if (!is.null(test_result$error)) {
+          result$p <- paste0("NA (", test_result$error, ")")
+        } else {
+          result$p <- fmt_p(test_result$p_value)
+        }
+        result$test <- test_result$test_name
 
         if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
           if (OR_method == "dynamic") {
             if (fisher_flag) {
-              fisher_obj <- fisher.test(tab)
-              result$OR <- sprintf("%.2f [%.2f–%.2f]", fisher_obj$estimate, fisher_obj$conf.int[1], fisher_obj$conf.int[2])
-              result$OR_method <- "Fisher"
+              fisher_obj <- tryCatch(stats::fisher.test(tab), error = function(e) NULL)
+              if (!is.null(fisher_obj)) {
+                result$OR <- sprintf("%.2f [%.2f–%.2f]", fisher_obj$estimate, fisher_obj$conf.int[1], fisher_obj$conf.int[2])
+                result$OR_method <- "Fisher"
+              } else {
+                result$OR <- "NA (calculation failed)"
+                result$OR_method <- "Fisher"
+              }
             } else {
               or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-              result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else NA_character_
+              result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
               result$OR_method <- "Wald"
             }
           } else if (OR_method == "wald") {
             or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-            result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else NA_character_
+            result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
             result$OR_method <- "Wald"
           }
         } else if (OR_col) {
@@ -113,6 +141,7 @@ ternG <- function(data,
           result$Total <- paste0(tab_total_n[ref_level], " (", tab_total_pct[ref_level], "%)")
         }
       } else {
+        # For multinomial variables (>2 levels), share the same p-value across all levels
         rows <- lapply(colnames(tab), function(level) {
           out <- tibble(Variable = paste0(var, ": ", level))
           for (g_lvl in group_levels) {
@@ -123,11 +152,14 @@ ternG <- function(data,
             }
             out[[group_labels[g_lvl]]] <- val
           }
-          out$p <- fmt_p(tryCatch(
-            if (any(tab < 5)) fisher.test(tab)$p.value else chisq.test(tab)$p.value,
-            error = function(e) NA_real_
-          ))
-          out$test <- if (any(tab < 5)) "Fisher exact" else "Chi-squared"
+          
+          if (!is.null(test_result$error)) {
+            out$p <- paste0("NA (", test_result$error, ")")
+          } else {
+            out$p <- fmt_p(test_result$p_value)
+          }
+          out$test <- test_result$test_name
+          
           if (OR_col) {
             out$OR <- NA_character_
             out$OR_method <- NA_character_
@@ -157,13 +189,36 @@ ternG <- function(data,
           "NA [NA–NA]"
         }
       }
-      p <- tryCatch(
-        if (n_levels == 2) wilcox.test(g[[var]] ~ g[[group_var]])$p.value
-        else kruskal.test(g[[var]] ~ g[[group_var]])$p.value,
-        error = function(e) NA_real_
-      )
-      result$p <- fmt_p(p)
-      result$test <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
+      
+      test_result <- tryCatch({
+        if (n_levels == 2) {
+          p_val <- stats::wilcox.test(g[[var]] ~ g[[group_var]])$p.value
+          list(p_value = p_val, test_name = "Wilcoxon rank-sum", error = NULL)
+        } else {
+          p_val <- stats::kruskal.test(g[[var]] ~ g[[group_var]])$p.value
+          list(p_value = p_val, test_name = "Kruskal-Wallis", error = NULL)
+        }
+      }, error = function(e) {
+        # Determine reason for test failure
+        group_sizes <- table(g[[group_var]])
+        if (any(group_sizes < 2)) {
+          reason <- "insufficient group sizes"
+        } else if (length(unique(g[[var]])) < 2) {
+          reason <- "no variation in values"
+        } else {
+          reason <- "test failure"
+        }
+        test_name <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
+        list(p_value = NA_real_, test_name = test_name, error = reason)
+      })
+      
+      if (!is.null(test_result$error)) {
+        result$p <- paste0("NA (", test_result$error, ")")
+      } else {
+        result$p <- fmt_p(test_result$p_value)
+      }
+      result$test <- test_result$test_name
+      
       if (OR_col) result$OR <- NA_character_
       if (descriptive) {
         val_total <- g %>% summarise(Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
@@ -175,7 +230,7 @@ ternG <- function(data,
         for (g_lvl in group_levels) {
           sw_p <- tryCatch({
             x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
-            if (length(x) >= 3) shapiro.test(x)$p.value else NA_real_
+            if (length(x) >= 3) stats::shapiro.test(x)$p.value else NA_real_
           }, error = function(e) NA_real_)
           result[[paste0("SW_p_", g_lvl)]] <- formatC(sw_p, format = "f", digits = 4)
         }
@@ -190,7 +245,7 @@ ternG <- function(data,
       sw_p_all <- tryCatch({
         out <- lapply(group_levels, function(g_lvl) {
           x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
-          pval <- if (length(x) >= 3) shapiro.test(x)$p.value else NA_real_
+          pval <- if (length(x) >= 3) stats::shapiro.test(x)$p.value else NA_real_
           setNames(pval, paste0("SW_p_", g_lvl))
         })
         do.call(c, out)
@@ -217,14 +272,37 @@ ternG <- function(data,
       }
     }
 
-    p <- tryCatch(
-      if (n_levels == 2) t.test(g[[var]] ~ g[[group_var]])$p.value
-      else aov(g[[var]] ~ g[[group_var]]) %>% summary() %>% .[[1]] %>% .["Pr(>F)"][[1]][1],
-      error = function(e) NA_real_
-    )
-
-    result$p <- fmt_p(p)
-    result$test <- if (n_levels == 2) "t-test" else "ANOVA"
+    test_result <- tryCatch({
+      if (n_levels == 2) {
+        p_val <- stats::t.test(g[[var]] ~ g[[group_var]])$p.value
+        list(p_value = p_val, test_name = "t-test", error = NULL)
+      } else {
+        p_val <- stats::aov(g[[var]] ~ g[[group_var]]) %>% summary() %>% .[[1]] %>% .["Pr(>F)"][[1]][1]
+        list(p_value = p_val, test_name = "ANOVA", error = NULL)
+      }
+    }, error = function(e) {
+      # Determine reason for test failure
+      group_sizes <- table(g[[group_var]])
+      if (any(group_sizes < 2)) {
+        reason <- "insufficient group sizes"
+      } else if (all(is.na(g[[var]]))) {
+        reason <- "all values missing"
+      } else if (var(g[[var]], na.rm = TRUE) == 0) {
+        reason <- "no variation in values"
+      } else {
+        reason <- "test failure"
+      }
+      test_name <- if (n_levels == 2) "t-test" else "ANOVA"
+      list(p_value = NA_real_, test_name = test_name, error = reason)
+    })
+    
+    if (!is.null(test_result$error)) {
+      result$p <- paste0("NA (", test_result$error, ")")
+    } else {
+      result$p <- fmt_p(test_result$p_value)
+    }
+    result$test <- test_result$test_name
+    
     if (OR_col) result$OR <- NA_character_
     if (descriptive) {
       val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
