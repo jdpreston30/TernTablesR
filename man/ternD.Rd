@@ -2,30 +2,39 @@
 % Please edit documentation in R/ternD.r
 \name{ternD}
 \alias{ternD}
-\title{Generate descriptive summary table without grouping}
+\title{Generate descriptive summary table (optionally normality-aware)}
 \usage{
 ternD(
   data,
   vars = NULL,
   exclude_vars = NULL,
   output_xlsx = NULL,
-  output_docx = NULL
+  output_docx = NULL,
+  consider_normality = FALSE,
+  print_normality = FALSE
 )
 }
 \arguments{
-\item{data}{Tibble containing all variables.}
+\item{data}{Tibble with variables.}
 
 \item{vars}{Character vector of variables to summarize. Defaults to all.}
 
-\item{exclude_vars}{Character vector of variable(s) to exclude.}
+\item{exclude_vars}{Character vector to exclude.}
 
-\item{output_xlsx}{Optional filename for Excel export.}
+\item{output_xlsx}{Optional Excel filename.}
 
-\item{output_docx}{Optional filename for Word export.}
+\item{output_docx}{Optional Word filename.}
+
+\item{consider_normality}{Logical; if TRUE choose mean±SD vs median [IQR].}
+
+\item{print_normality}{Logical; include Shapiro–Wilk p-values if TRUE.}
 }
 \value{
-A tibble with one row per variable (multi-row for multi-level factors), summary statistics across appropriate columns.
+Tibble; one row per variable (multi-row for factors).
 }
 \description{
-Generate descriptive summary table without grouping
+Generate descriptive summary table (optionally normality-aware)
+}
+\examples{
+# ternD(mtcars, consider_normality = TRUE, print_normality = TRUE)
 }
