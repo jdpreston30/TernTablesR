@@ -1,7 +1,7 @@
 Package: TernTablesR
 Type: Package
 Title: Generate Descriptive, Two-, or Three-Level Grouped Summary Tables
-Version: 0.1.0
+Version: 0.1.1
 Author: 
     Josh Preston [aut, cre],
     Helen Abadiotakis [aut]
