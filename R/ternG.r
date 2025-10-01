@@ -15,7 +15,7 @@
 #' @param output_docx Optional filename to export the table as a Word document.
 #' @param OR_col Logical; if \code{TRUE}, adds odds ratios for 2-level categorical variables.
 #' @param OR_method Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.
-#' @param consider_normality Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.
+#' @param consider_normality Logical or character; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars. If \code{FALSE}, uses variable type and force_ordinal. If \code{"FORCE"}, treats all numeric variables as ordinal (median/IQR, nonparametric tests).
 #' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
 #'
@@ -59,6 +59,11 @@ ternG <- function(data,
     paste0(group_levels, " (n = ", group_counts, ")"),
     group_levels
   )
+
+  # Initialize normality tracking variables
+  normality_results <- list()
+  numeric_vars_tested <- 0
+  numeric_vars_failed <- 0
 
   .summarize_var_internal <- function(df, var, force_ordinal = NULL) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
@@ -243,7 +248,15 @@ ternG <- function(data,
     # ----- Normality assessment -----
     sw_p_all <- list()
     is_normal <- TRUE
-    if (isTRUE(consider_normality)) {
+    
+    # Handle different consider_normality options
+    if (consider_normality == "FORCE") {
+      # Force all numeric variables to be treated as ordinal
+      is_normal <- FALSE
+      numeric_vars_tested <<- numeric_vars_tested + 1
+      numeric_vars_failed <<- numeric_vars_failed + 1
+    } else if (isTRUE(consider_normality)) {
+      # Test normality and track results
       sw_p_all <- tryCatch({
         out <- lapply(group_levels, function(g_lvl) {
           x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
@@ -253,7 +266,14 @@ ternG <- function(data,
         do.call(c, out)
       }, error = function(e) rep(NA, n_levels))
       is_normal <- all(sw_p_all > 0.05, na.rm = TRUE)
+      
+      # Track normality results for reporting
+      numeric_vars_tested <<- numeric_vars_tested + 1
+      if (!is_normal) {
+        numeric_vars_failed <<- numeric_vars_failed + 1
+      }
     }
+    # If consider_normality is FALSE, we don't test normality and proceed with normal distribution assumption
 
     if (!is_normal) {
       return(.summarize_var_internal(df, var = var, force_ordinal = var))
@@ -342,6 +362,19 @@ ternG <- function(data,
 
   if (!is.null(output_xlsx)) export_to_excel(out_tbl, output_xlsx)
   if (!is.null(output_docx)) export_to_word(out_tbl, output_docx)
+
+  # Report normality test results
+  if (numeric_vars_tested > 0 && (isTRUE(consider_normality) || consider_normality == "FORCE")) {
+    failed_pct <- round((numeric_vars_failed / numeric_vars_tested) * 100, 1)
+    message(sprintf("%d of %d numerical variables in your table failed normality tests (%s%%).", 
+                    numeric_vars_failed, numeric_vars_tested, failed_pct))
+    
+    if (consider_normality != "FORCE" && failed_pct > 50) {
+      message("Consider running with consider_normality = 'FORCE' if a majority of your variables fail normality for stylistic consistency.")
+    } else if (consider_normality == "FORCE" && failed_pct <= 50) {
+      message("Consider running with consider_normality = TRUE if a minority of your variables would fail normality for stylistic consistency.")
+    }
+  }
 
   return(out_tbl)
 }

@@ -44,7 +44,7 @@ ternG(
 
 \item{OR_method}{Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.}
 
-\item{consider_normality}{Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.}
+\item{consider_normality}{Logical or character; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars. If \code{FALSE}, uses variable type and force_ordinal. If \code{"FORCE"}, treats all numeric variables as ordinal (median/IQR, nonparametric tests).}
 
 \item{print_normality}{Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.}
 
