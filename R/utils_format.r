@@ -30,9 +30,8 @@ fmt_p <- function(p, digits = 3) {
     return(paste0(">0.", paste(rep("9", digits), collapse = "")))
   }
 
-  # For other values, use the minimum of digits or 2 for backward compatibility
-  actual_digits <- min(digits, 2)
-  return(sprintf(paste0("%.", actual_digits, "f"), round(p + .Machine$double.eps, actual_digits)))
+  # For all other values, use the specified digits
+  return(sprintf(paste0("%.", digits, "f"), p_rounded))
 }
 
 #' Format a mean ± SD string
