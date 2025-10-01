@@ -4,13 +4,15 @@
 \alias{fmt_p}
 \title{Format a p-value for reporting}
 \usage{
-fmt_p(p)
+fmt_p(p, digits = 3)
 }
 \arguments{
 \item{p}{Numeric p-value}
+
+\item{digits}{Number of decimal places to round to (default 3)}
 }
 \value{
-Formatted string with 2 decimals, scientific if < 0.001
+Formatted string with specified decimals, scientific if < 0.001
 }
 \description{
 Format a p-value for reporting

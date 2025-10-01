@@ -17,7 +17,8 @@ ternG(
   OR_col = FALSE,
   OR_method = "dynamic",
   consider_normality = TRUE,
-  print_normality = FALSE
+  print_normality = FALSE,
+  p_digits = 3
 )
 }
 \arguments{
@@ -46,6 +47,8 @@ ternG(
 \item{consider_normality}{Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.}
 
 \item{print_normality}{Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.}
+
+\item{p_digits}{Integer; number of decimal places for p-values (default 3).}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,

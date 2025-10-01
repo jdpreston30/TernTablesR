@@ -17,6 +17,7 @@
 #' @param OR_method Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.
 #' @param consider_normality Logical; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars.
 #' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.
+#' @param p_digits Integer; number of decimal places for p-values (default 3).
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 #' p-values, test type, and optionally odds ratios and total summary column.
@@ -34,7 +35,8 @@ ternG <- function(data,
                   OR_col = FALSE,
                   OR_method = "dynamic",
                   consider_normality = TRUE,
-                  print_normality = FALSE) {
+                  print_normality = FALSE,
+                  p_digits = 3) {
 
   if (is.null(vars)) {
     vars <- setdiff(names(data), unique(c(exclude_vars, group_var)))
@@ -107,7 +109,7 @@ ternG <- function(data,
         if (!is.null(test_result$error)) {
           result$p <- paste0("NA (", test_result$error, ")")
         } else {
-          result$p <- fmt_p(test_result$p_value)
+          result$p <- fmt_p(test_result$p_value, p_digits)
         }
         result$test <- test_result$test_name
 
@@ -156,7 +158,7 @@ ternG <- function(data,
           if (!is.null(test_result$error)) {
             out$p <- paste0("NA (", test_result$error, ")")
           } else {
-            out$p <- fmt_p(test_result$p_value)
+            out$p <- fmt_p(test_result$p_value, p_digits)
           }
           out$test <- test_result$test_name
           
@@ -215,7 +217,7 @@ ternG <- function(data,
       if (!is.null(test_result$error)) {
         result$p <- paste0("NA (", test_result$error, ")")
       } else {
-        result$p <- fmt_p(test_result$p_value)
+        result$p <- fmt_p(test_result$p_value, p_digits)
       }
       result$test <- test_result$test_name
       
@@ -299,7 +301,7 @@ ternG <- function(data,
     if (!is.null(test_result$error)) {
       result$p <- paste0("NA (", test_result$error, ")")
     } else {
-      result$p <- fmt_p(test_result$p_value)
+      result$p <- fmt_p(test_result$p_value, p_digits)
     }
     result$test <- test_result$test_name
     
@@ -323,35 +325,18 @@ ternG <- function(data,
   })
                         
   # -- Standardize group headers and enforce final column order (level-agnostic)
+  # Keep the group column names with "n = x" format as requested
 
-  # 1) Build a rename map from the labels you created (e.g., "Alive (n = 40)")
-  #    to the plain level names (e.g., "Alive"), but only for columns that exist.
-  clean_count_suffix <- function(nm) sub("\\s*\\(n\\s*=\\s*\\d+\\)\\s*$", "", nm)
-
-  # Vector of original group-labeled column names in the table
-  orig_group_cols <- unname(group_labels) # e.g., "Y (n = 34)", "N (n = 32)", or other levels
-  orig_group_cols <- intersect(orig_group_cols, names(out_tbl))
-
-  # Corresponding clean names (use the actual level names from names(group_labels))
-  clean_group_names <- clean_count_suffix(orig_group_cols) # or: names(group_labels)[match(orig_group_cols, unname(group_labels))]
-
-  # rename() needs new = old
-  if (length(orig_group_cols)) {
-    rename_map <- stats::setNames(orig_group_cols, clean_group_names)
-    out_tbl <- dplyr::rename(out_tbl, !!!rename_map)
-  }
-
-  # 2) Determine the final order of the group columns based on group_levels (any number of levels)
-  #    Keep only those group levels that actually made it into out_tbl
-  desired_group_cols <- intersect(group_levels, names(out_tbl))
-
-  # 3) Collect any normality cols
+  # Collect any normality cols
   normality_cols <- grep("^SW_p_", names(out_tbl), value = TRUE)
 
-  # 4) Desired column order (level-agnostic)
-  desired <- c("Variable", desired_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
+  # The group columns should already have the "n = x" format from group_labels
+  existing_group_cols <- intersect(unname(group_labels), names(out_tbl))
 
-  # 5) Reorder: put desired first (when they exist), then everything else
+  # Desired column order (keeping group columns with n = x format)
+  desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
+
+  # Reorder: put desired first (when they exist), then everything else
   out_tbl <- dplyr::select(out_tbl, dplyr::any_of(desired), dplyr::everything())
                         
 
