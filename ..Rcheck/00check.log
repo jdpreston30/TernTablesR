@@ -1,0 +1,161 @@
+* using log directory ‘/Users/JoshsMacbook2015/Desktop/TernTablesR/..Rcheck’
+* using R version 4.5.1 (2025-06-13)
+* using platform: x86_64-apple-darwin23.6.0
+* R was compiled by
+    Apple clang version 16.0.0 (clang-1600.0.26.6)
+    GNU Fortran (Homebrew GCC 15.1.0) 15.1.0
+* running under: macOS Sonoma 14.5
+* using session charset: UTF-8
+* using option ‘--no-manual’
+* checking for file ‘./DESCRIPTION’ ... OK
+* checking extension type ... Package
+* this is package ‘TernTablesR’ version ‘0.1.1’
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... OK
+* checking if this is a source package ... OK
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... NOTE
+Found the following hidden files and directories:
+  .DS_Store
+  .gitignore
+  R/.DS_Store
+  inst/.DS_Store
+  inst/examples/.DS_Store
+  inst/examples/Outputs/.DS_Store
+  ..Rcheck
+  .git
+These were most likely included in error. See section ‘Package
+structure’ in the ‘Writing R Extensions’ manual.
+* checking for portable file names ... OK
+* checking for sufficient/correct file permissions ... OK
+* checking whether package ‘TernTablesR’ can be installed ... OK
+* checking installed package size ... OK
+* checking package directory ... OK
+* checking DESCRIPTION meta-information ... WARNING
+Invalid license file pointers: LICENSE
+Checking should be performed on sources prepared by ‘R CMD build’.
+* checking top-level files ... OK
+* checking for left-over files ... OK
+* checking index information ... OK
+* checking package subdirectories ... WARNING
+Found the following directory with the name of a check directory:
+  ./..Rcheck
+Most likely, these were included erroneously.
+* checking code files for non-ASCII characters ... WARNING
+Found the following files with non-ASCII characters:
+  R/export_to_word.r
+  R/ternD.r
+  R/ternG.r
+  R/utils_format.r
+Portable packages must use only ASCII characters in their R code and
+NAMESPACE directives, except perhaps in comments.
+Use \uxxxx escapes for other characters.
+Function ‘tools::showNonASCIIfile’ can help in finding non-ASCII
+characters in files.
+* checking R files for syntax errors ... OK
+* checking whether the package can be loaded ... OK
+* checking whether the package can be loaded with stated dependencies ... OK
+* checking whether the package can be unloaded cleanly ... OK
+* checking whether the namespace can be loaded with stated dependencies ... OK
+* checking whether the namespace can be unloaded cleanly ... OK
+* checking loading without being on the library search path ... OK
+* checking dependencies in R code ... WARNING
+'::' or ':::' import not declared from: ‘epitools’
+'library' or 'require' calls not declared from:
+  ‘flextable’ ‘officer’
+'library' or 'require' calls in package code:
+  ‘flextable’ ‘officer’
+  Please use :: or requireNamespace() instead.
+  See section 'Suggested packages' in the 'Writing R Extensions' manual.
+Namespaces in Imports field not imported from:
+  ‘flextable’ ‘officer’ ‘readr’ ‘stringr’
+  All declared Imports should be used.
+* checking S3 generic/method consistency ... OK
+* checking replacement functions ... OK
+* checking foreign function calls ... OK
+* checking R code for possible problems ... NOTE
+export_to_word: no visible global function definition for ‘%>%’
+export_to_word: no visible global function definition for ‘flextable’
+export_to_word: no visible global function definition for
+  ‘set_table_properties’
+export_to_word: no visible global function definition for ‘fontsize’
+export_to_word: no visible global function definition for ‘bold’
+export_to_word: no visible global function definition for ‘italic’
+export_to_word: no visible global function definition for ‘align’
+export_to_word: no visible global function definition for ‘fpar’
+export_to_word: no visible global function definition for ‘ftext’
+export_to_word: no visible global function definition for ‘fp_text’
+export_to_word: no visible global function definition for ‘read_docx’
+export_to_word: no visible global function definition for
+  ‘body_add_flextable’
+export_to_word: no visible global function definition for
+  ‘body_add_par’
+export_to_word: no visible global function definition for
+  ‘body_add_fpar’
+ternG: no visible global function definition for ‘%>%’
+ternG: no visible global function definition for ‘filter’
+ternG: no visible binding for global variable ‘.data’
+ternG: no visible global function definition for ‘count’
+ternG: no visible global function definition for ‘deframe’
+ternG: no visible global function definition for ‘setNames’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘%>%’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘filter’
+ternG : .summarize_var_internal: no visible binding for global variable
+  ‘.data’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘tibble’
+ternG : .summarize_var_internal : <anonymous>: no visible global
+  function definition for ‘tibble’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘bind_rows’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘group_by’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘summarise’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘quantile’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘median’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘pull’
+ternG : .summarize_var_internal : <anonymous>: no visible global
+  function definition for ‘%>%’
+ternG : .summarize_var_internal : <anonymous>: no visible global
+  function definition for ‘filter’
+ternG : .summarize_var_internal : <anonymous>: no visible binding for
+  global variable ‘.data’
+ternG : .summarize_var_internal : <anonymous>: no visible global
+  function definition for ‘pull’
+ternG : .summarize_var_internal : <anonymous>: no visible global
+  function definition for ‘setNames’
+ternG : .summarize_var_internal: no visible global function definition
+  for ‘sd’
+ternG : .summarize_var_internal: no visible binding for global variable
+  ‘.’
+ternG: no visible global function definition for ‘bind_rows’
+ternG: no visible binding for global variable ‘test’
+Undefined global functions or variables:
+  %>% . .data align bind_rows body_add_flextable body_add_fpar
+  body_add_par bold count deframe filter flextable fontsize fp_text
+  fpar ftext group_by italic median pull quantile read_docx sd setNames
+  set_table_properties summarise test tibble
+Consider adding
+  importFrom("stats", "filter", "median", "quantile", "sd", "setNames")
+to your NAMESPACE file.
+* checking Rd files ... OK
+* checking Rd metadata ... OK
+* checking Rd cross-references ... OK
+* checking for missing documentation entries ... OK
+* checking for code/documentation mismatches ... OK
+* checking Rd \usage sections ... OK
+* checking Rd contents ... OK
+* checking for unstated dependencies in examples ... OK
+* checking LazyData ... INFO
+  'LazyData' is specified without a 'data' directory
+* checking examples ... OK
+* DONE
+Status: 4 WARNINGs, 2 NOTEs

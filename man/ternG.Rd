@@ -18,6 +18,7 @@ ternG(
   OR_method = "dynamic",
   consider_normality = TRUE,
   print_normality = FALSE,
+  show_test = TRUE,
   p_digits = 3
 )
 }
@@ -47,6 +48,8 @@ ternG(
 \item{consider_normality}{Logical or character; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars. If \code{FALSE}, uses variable type and force_ordinal. If \code{"FORCE"}, treats all numeric variables as ordinal (median/IQR, nonparametric tests).}
 
 \item{print_normality}{Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.}
+
+\item{show_test}{Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.}
 
 \item{p_digits}{Integer; number of decimal places for p-values (default 3).}
 }

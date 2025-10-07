@@ -1,6 +1,5 @@
-# If testing locally:
+# Example usage of Tern2v and Tern3v functions
 # Requires synthetic_data.csv located in inst/examples/
-{
 library(dplyr)
 library(readr)
 library(tibble)
@@ -8,10 +7,11 @@ library(stats)
 library(writexl)
 library(officer)
 library(flextable)
+
+# If testing locally
 source("R/ternG.r")
 source("R/export_to_word.r")
 source("R/utils_format.r")
-}
 # Import and structure data
 demographics_i <- read_csv("inst/examples/synthetic_data.csv")  %>%
     mutate(
@@ -37,9 +37,9 @@ Tern2v <- ternG(
   group_var = "index_operative",
   force_ordinal = c("ISS", "GCS"),
   group_order = c("Nonoperative", "Operative"),
-  output_xlsx = "inst/examples/Outputs/summary_oper_vs_nonop.xlsx",
-  output_docx = "inst/examples/Outputs/summary_oper_vs_nonop.docx",
-  OR_col = FALSE,
+  output_xlsx = "Outputs/summary_oper_vs_nonop.xlsx",
+  output_docx = "Outputs/summary_oper_vs_nonop.docx",
+  OR_col = TRUE,
   consider_normality = "FORCE",
   show_test = FALSE
 )

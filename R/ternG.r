@@ -17,6 +17,7 @@
 #' @param OR_method Character; if \code{"dynamic"}, uses Fisher/Wald based on test type. If \code{"wald"}, forces Wald method.
 #' @param consider_normality Logical or character; if \code{TRUE}, uses Shapiro-Wilk to choose t-test vs. Wilcoxon for numeric vars. If \code{FALSE}, uses variable type and force_ordinal. If \code{"FORCE"}, treats all numeric variables as ordinal (median/IQR, nonparametric tests).
 #' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.
+#' @param show_test Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
@@ -36,6 +37,7 @@ ternG <- function(data,
                   OR_method = "dynamic",
                   consider_normality = TRUE,
                   print_normality = FALSE,
+                  show_test = TRUE,
                   p_digits = 3) {
 
   if (is.null(vars)) {
@@ -65,7 +67,7 @@ ternG <- function(data,
   numeric_vars_tested <- 0
   numeric_vars_failed <- 0
 
-  .summarize_var_internal <- function(df, var, force_ordinal = NULL) {
+  .summarize_var_internal <- function(df, var, force_ordinal = NULL, show_test = TRUE) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
     if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
@@ -116,7 +118,9 @@ ternG <- function(data,
         } else {
           result$p <- fmt_p(test_result$p_value, p_digits)
         }
-        result$test <- test_result$test_name
+        if (show_test) {
+          result$test <- test_result$test_name
+        }
 
         if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
           if (OR_method == "dynamic") {
@@ -165,7 +169,9 @@ ternG <- function(data,
           } else {
             out$p <- fmt_p(test_result$p_value, p_digits)
           }
-          out$test <- test_result$test_name
+          if (show_test) {
+            out$test <- test_result$test_name
+          }
           
           if (OR_col) {
             out$OR <- NA_character_
@@ -224,7 +230,9 @@ ternG <- function(data,
       } else {
         result$p <- fmt_p(test_result$p_value, p_digits)
       }
-      result$test <- test_result$test_name
+      if (show_test) {
+        result$test <- test_result$test_name
+      }
       
       if (OR_col) result$OR <- NA_character_
       if (descriptive) {
@@ -251,10 +259,25 @@ ternG <- function(data,
     
     # Handle different consider_normality options
     if (consider_normality == "FORCE") {
-      # Force all numeric variables to be treated as ordinal
-      is_normal <- FALSE
+      # Test normality for baseline statistics but force all to be treated as ordinal
+      sw_p_all <- tryCatch({
+        out <- lapply(group_levels, function(g_lvl) {
+          x <- g %>% filter(.data[[group_var]] == g_lvl) %>% pull(.data[[var]])
+          pval <- if (length(x) >= 3) stats::shapiro.test(x)$p.value else NA_real_
+          setNames(pval, paste0("SW_p_", g_lvl))
+        })
+        do.call(c, out)
+      }, error = function(e) rep(NA, n_levels))
+      baseline_normal <- all(sw_p_all > 0.05, na.rm = TRUE)
+      
+      # Track baseline normality results for reporting
       numeric_vars_tested <<- numeric_vars_tested + 1
-      numeric_vars_failed <<- numeric_vars_failed + 1
+      if (!baseline_normal) {
+        numeric_vars_failed <<- numeric_vars_failed + 1
+      }
+      
+      # Force all to be treated as ordinal regardless of normality
+      is_normal <- FALSE
     } else if (isTRUE(consider_normality)) {
       # Test normality and track results
       sw_p_all <- tryCatch({
@@ -276,7 +299,7 @@ ternG <- function(data,
     # If consider_normality is FALSE, we don't test normality and proceed with normal distribution assumption
 
     if (!is_normal) {
-      return(.summarize_var_internal(df, var = var, force_ordinal = var))
+      return(.summarize_var_internal(df, var = var, force_ordinal = var, show_test = show_test))
     }
 
     # ----- Normally distributed numeric -----
@@ -323,7 +346,9 @@ ternG <- function(data,
     } else {
       result$p <- fmt_p(test_result$p_value, p_digits)
     }
-    result$test <- test_result$test_name
+    if (show_test) {
+      result$test <- test_result$test_name
+    }
     
     if (OR_col) result$OR <- NA_character_
     if (descriptive) {
@@ -339,7 +364,7 @@ ternG <- function(data,
   }
 
   out_tbl <- suppressWarnings({
-    result <- bind_rows(lapply(vars, function(v) .summarize_var_internal(data, v, force_ordinal)))
+    result <- bind_rows(lapply(vars, function(v) .summarize_var_internal(data, v, force_ordinal, show_test)))
     message("Note: Categorical variables with >2 levels return multiple rows.")
     result
   })
@@ -354,7 +379,15 @@ ternG <- function(data,
   existing_group_cols <- intersect(unname(group_labels), names(out_tbl))
 
   # Desired column order (keeping group columns with n = x format)
-  desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
+  if (show_test) {
+    desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
+  } else {
+    desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "OR_method", normality_cols)
+    # Remove test column if it exists
+    if ("test" %in% names(out_tbl)) {
+      out_tbl <- dplyr::select(out_tbl, -test)
+    }
+  }
 
   # Reorder: put desired first (when they exist), then everything else
   out_tbl <- dplyr::select(out_tbl, dplyr::any_of(desired), dplyr::everything())
@@ -372,7 +405,7 @@ ternG <- function(data,
         "%d of %d numerical variables failed normality tests at baseline (%s%%).",
         numeric_vars_failed, numeric_vars_tested, failed_pct
       ))
-      message("Note: consider_normality = 'FORCE' used; all numeric variables were displayed as median [IQR] and tested using nonparametric methods (Wilcoxon rank-sum for two groups or Kruskal–Wallis for ≥3 groups).")
+      message("Note: consider_normality = 'FORCE' used; treating all numeric variables as non-normal. All displayed as median [IQR] and tested using nonparametric methods (Wilcoxon rank-sum for two groups or Kruskal–Wallis for ≥3 groups).")
     } else {
       message(sprintf(
         "%d of %d numerical variables in your table failed normality tests (%s%%).",

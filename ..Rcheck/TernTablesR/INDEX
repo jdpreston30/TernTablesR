@@ -1,0 +1,8 @@
+export_to_word          Export TernTablesR output to a formatted Word
+                        document
+fmt_p                   Format a p-value for reporting
+format_val              Format a mean ± SD string
+ternD                   Generate descriptive summary table (optionally
+                        normality-aware)
+ternG                   Generate grouped or descriptive summary table
+                        with appropriate statistical tests

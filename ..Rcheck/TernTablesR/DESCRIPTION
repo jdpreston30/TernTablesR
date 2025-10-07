@@ -1,0 +1,21 @@
+Package: TernTablesR
+Type: Package
+Title: Generate Descriptive, Two-, or Three-Level Grouped Summary
+        Tables
+Version: 0.1.1
+Author: 
+    Josh Preston [aut, cre],
+    Helen Abadiotakis [aut]
+Maintainer: Josh Preston <jdpreston30@gmail.com>
+Description: Automatically generates publication-ready summary tables for descriptive statistics and for comparing binary 
+    or three-level groups. Detects variable types (categorical, ordinal, or continuous), 
+    applies the appropriate statistical test (Fisher's exact, Chi-squared, Wilcoxon, or Welch t-test), 
+    and formats results for export to Word or Excel. Designed for efficient clinical data reporting.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.3
+Imports: dplyr, tibble, flextable, officer, writexl, readr, stringr,
+        stats
+Suggests: testthat, knitr, rmarkdown
+Built: R 4.5.1; ; 2025-10-07 22:22:44 UTC; unix

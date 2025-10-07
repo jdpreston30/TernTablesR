@@ -7,7 +7,7 @@
 export_to_word(tbl, filename)
 }
 \arguments{
-\item{tbl}{A tibble created by Tern2v or Tern3v}
+\item{tbl}{A tibble created by ternG or ternD}
 
 \item{filename}{Output file path ending in .docx}
 }
