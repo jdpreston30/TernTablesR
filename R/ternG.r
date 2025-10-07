@@ -19,6 +19,7 @@
 #' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values in the output.
 #' @param show_test Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
+#' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 #' p-values, test type, and optionally odds ratios and total summary column.
@@ -38,7 +39,18 @@ ternG <- function(data,
                   consider_normality = TRUE,
                   print_normality = FALSE,
                   show_test = TRUE,
-                  p_digits = 3) {
+                  p_digits = 3,
+                  round_intg = FALSE) {
+
+  # Helper function for proper rounding (0.5 always rounds up)
+  round_up_half <- function(x, digits = 0) {
+    if (digits == 0) {
+      floor(x + 0.5)
+    } else {
+      factor <- 10^digits
+      floor(x * factor + 0.5) / factor
+    }
+  }
 
   if (is.null(vars)) {
     vars <- setdiff(names(data), unique(c(exclude_vars, group_var)))
@@ -67,7 +79,7 @@ ternG <- function(data,
   numeric_vars_tested <- 0
   numeric_vars_failed <- 0
 
-  .summarize_var_internal <- function(df, var, force_ordinal = NULL, show_test = TRUE) {
+  .summarize_var_internal <- function(df, var, force_ordinal = NULL, show_test = TRUE, round_intg = FALSE) {
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
     if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
@@ -190,9 +202,9 @@ ternG <- function(data,
     # ----- Force ordinal -----
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
       stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
-        Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
-        med = round(median(.data[[var]], na.rm = TRUE), 1),
-        Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1), .groups = "drop")
+        Q1 = if (round_intg) round_up_half(quantile(.data[[var]], 0.25, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
+        med = if (round_intg) round_up_half(median(.data[[var]], na.rm = TRUE), 0) else round(median(.data[[var]], na.rm = TRUE), 1),
+        Q3 = if (round_intg) round_up_half(quantile(.data[[var]], 0.75, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1), .groups = "drop")
       result <- tibble(Variable = var)
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
@@ -236,9 +248,10 @@ ternG <- function(data,
       
       if (OR_col) result$OR <- NA_character_
       if (descriptive) {
-        val_total <- g %>% summarise(Q1 = round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
-                                     med = round(median(.data[[var]], na.rm = TRUE), 1),
-                                     Q3 = round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1))
+        val_total <- g %>% summarise(
+          Q1 = if (round_intg) round_up_half(quantile(.data[[var]], 0.25, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
+          med = if (round_intg) round_up_half(median(.data[[var]], na.rm = TRUE), 0) else round(median(.data[[var]], na.rm = TRUE), 1),
+          Q3 = if (round_intg) round_up_half(quantile(.data[[var]], 0.75, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1))
         result$Total <- paste0(val_total$med, " [", val_total$Q1, "–", val_total$Q3, "]")
       }
       if (print_normality) {
@@ -299,7 +312,7 @@ ternG <- function(data,
     # If consider_normality is FALSE, we don't test normality and proceed with normal distribution assumption
 
     if (!is_normal) {
-      return(.summarize_var_internal(df, var = var, force_ordinal = var, show_test = show_test))
+      return(.summarize_var_internal(df, var = var, force_ordinal = var, show_test = show_test, round_intg = round_intg))
     }
 
     # ----- Normally distributed numeric -----
@@ -311,7 +324,11 @@ ternG <- function(data,
     for (g_lvl in group_levels) {
       val <- stats %>% filter(.data[[group_var]] == g_lvl)
       result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) {
-        paste0(round(val$mean, 1), " ± ", round(val$sd, 1))
+        if (round_intg) {
+          paste0(round_up_half(val$mean, 0), " ± ", round_up_half(val$sd, 0))
+        } else {
+          paste0(round(val$mean, 1), " ± ", round(val$sd, 1))
+        }
       } else {
         "NA ± NA"
       }
@@ -353,7 +370,11 @@ ternG <- function(data,
     if (OR_col) result$OR <- NA_character_
     if (descriptive) {
       val_total <- g %>% summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
-      result$Total <- paste0(round(val_total$mean, 1), " ± ", round(val_total$sd, 1))
+      if (round_intg) {
+        result$Total <- paste0(round_up_half(val_total$mean, 0), " ± ", round_up_half(val_total$sd, 0))
+      } else {
+        result$Total <- paste0(round(val_total$mean, 1), " ± ", round(val_total$sd, 1))
+      }
     }
     if (print_normality && length(sw_p_all) > 0) {
       for (nm in names(sw_p_all)) {
@@ -364,7 +385,7 @@ ternG <- function(data,
   }
 
   out_tbl <- suppressWarnings({
-    result <- bind_rows(lapply(vars, function(v) .summarize_var_internal(data, v, force_ordinal, show_test)))
+    result <- bind_rows(lapply(vars, function(v) .summarize_var_internal(data, v, force_ordinal, show_test, round_intg)))
     message("Note: Categorical variables with >2 levels return multiple rows.")
     result
   })

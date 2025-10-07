@@ -7,14 +7,26 @@
 #' @param output_docx Optional Word filename.
 #' @param consider_normality Logical; if TRUE choose mean±SD vs median [IQR].
 #' @param print_normality Logical; include Shapiro–Wilk p-values if TRUE.
+#' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
 #' @return Tibble; one row per variable (multi-row for factors).
 #' @examples
 #' # ternD(mtcars, consider_normality = TRUE, print_normality = TRUE)
 #' @export
 ternD <- function(data, vars = NULL, exclude_vars = NULL,
                   output_xlsx = NULL, output_docx = NULL,
-                  consider_normality = FALSE, print_normality = FALSE) {
+                  consider_normality = FALSE, print_normality = FALSE, 
+                  round_intg = FALSE) {
   stopifnot(is.data.frame(data))
+
+  # Helper function for proper rounding (0.5 always rounds up)
+  round_up_half <- function(x, digits = 0) {
+    if (digits == 0) {
+      floor(x + 0.5)
+    } else {
+      factor <- 10^digits
+      floor(x * factor + 0.5) / factor
+    }
+  }
 
   if (is.null(vars)) {
     vars <- setdiff(names(data), exclude_vars)
@@ -23,12 +35,20 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
   fmt_mean_sd <- function(x) {
     m <- mean(x, na.rm = TRUE)
     s <- stats::sd(x, na.rm = TRUE)
-    paste0(round(m, 1), " ± ", round(s, 1))
+    if (round_intg) {
+      paste0(round_up_half(m, 0), " ± ", round_up_half(s, 0))
+    } else {
+      paste0(round(m, 1), " ± ", round(s, 1))
+    }
   }
 
   fmt_median_iqr <- function(x) {
     q <- stats::quantile(x, probs = c(0.25, 0.5, 0.75), na.rm = TRUE, names = FALSE)
-    paste0(round(q[2], 1), " [", round(q[1], 1), "–", round(q[3], 1), "]")
+    if (round_intg) {
+      paste0(round_up_half(q[2], 0), " [", round_up_half(q[1], 0), "–", round_up_half(q[3], 0), "]")
+    } else {
+      paste0(round(q[2], 1), " [", round(q[1], 1), "–", round(q[3], 1), "]")
+    }
   }
 
   shapiro_p <- function(x) {

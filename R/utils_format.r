@@ -9,6 +9,11 @@ fmt_p <- function(p, digits = 3) {
     return(NA_character_)
   }
 
+  # Handle p-values >= 1 or very close to 1 (due to rounding/floating point issues)
+  if (p >= 1.0 || round(p, digits) >= 1.0) {
+    return(paste0(">0.", paste(rep("9", digits), collapse = "")))
+  }
+
   # Use proper rounding (5 rounds up, not banker's rounding)
   p_rounded <- round(p + .Machine$double.eps, digits)
 
@@ -24,10 +29,6 @@ fmt_p <- function(p, digits = 3) {
 
   if (p >= 0.94 && p < 1) {
     return(sprintf(paste0("%.", digits, "f"), p_rounded))
-  }
-
-  if (p == 1) {
-    return(paste0(">0.", paste(rep("9", digits), collapse = "")))
   }
 
   # For all other values, use the specified digits

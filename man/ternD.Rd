@@ -11,7 +11,8 @@ ternD(
   output_xlsx = NULL,
   output_docx = NULL,
   consider_normality = FALSE,
-  print_normality = FALSE
+  print_normality = FALSE,
+  round_intg = FALSE
 )
 }
 \arguments{
@@ -28,6 +29,8 @@ ternD(
 \item{consider_normality}{Logical; if TRUE choose mean±SD vs median [IQR].}
 
 \item{print_normality}{Logical; include Shapiro–Wilk p-values if TRUE.}
+
+\item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
 }
 \value{
 Tibble; one row per variable (multi-row for factors).

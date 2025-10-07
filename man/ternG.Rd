@@ -19,7 +19,8 @@ ternG(
   consider_normality = TRUE,
   print_normality = FALSE,
   show_test = TRUE,
-  p_digits = 3
+  p_digits = 3,
+  round_intg = FALSE
 )
 }
 \arguments{
@@ -52,6 +53,8 @@ ternG(
 \item{show_test}{Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.}
 
 \item{p_digits}{Integer; number of decimal places for p-values (default 3).}
+
+\item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
