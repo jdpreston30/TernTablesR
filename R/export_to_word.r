@@ -18,27 +18,27 @@ export_to_word <- function(tbl, filename) {
   # Full methods description
   footer_note <- fpar(
     ftext(
-      "Statistical Methods: For continuous variables, normality was assessed using the Shapiro-Wilk test. ",
+      "Statistical Methods: For continuous variables, normality was assessed using the Shapiro–Wilk test (when enabled). ",
       fp_text(font.size = 8, italic = TRUE)
     ),
     ftext(
-      "For 2-group comparisons, normally distributed variables were compared using Welch’s t-test; non-normal distributions were compared using the Wilcoxon rank-sum test. ",
+      "Normally distributed variables were summarized as mean ± SD and compared using Welch’s t-test for two-group comparisons or one-way ANOVA for three-group comparisons. ",
       fp_text(font.size = 8, italic = TRUE)
     ),
     ftext(
-      "For 3-group comparisons, normally distributed variables were compared using one-way ANOVA; non-normal or ordinal variables specified by the user were compared using the Kruskal-Wallis test. ",
+      "Non-normally distributed or user-specified ordinal variables were summarized as median [IQR] and compared using the Wilcoxon rank-sum test (two groups) or Kruskal–Wallis test (three groups). ",
       fp_text(font.size = 8, italic = TRUE)
     ),
     ftext(
-      "Categorical variables were compared using Chi-squared tests or Fisher’s exact tests if expected counts were <5. ",
+      "Categorical variables were summarized as n (%) and compared using Chi-squared tests or Fisher’s exact tests when expected counts were <5. ",
       fp_text(font.size = 8, italic = TRUE)
     ),
     ftext(
-      "Ordinal variables were summarized as medians [IQR] and compared using appropriate non-parametric tests. ",
+      "For binary categorical variables, odds ratios with 95% confidence intervals were computed using Fisher’s exact or Wald methods, as appropriate. ",
       fp_text(font.size = 8, italic = TRUE)
     ),
     ftext(
-      "Note: Approximate p-values were used for non-parametric tests with tied data.",
+      "Approximate p-values were used for non-parametric tests with tied data.",
       fp_text(font.size = 8, italic = TRUE)
     )
   )
