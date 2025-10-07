@@ -363,16 +363,27 @@ ternG <- function(data,
   if (!is.null(output_xlsx)) export_to_excel(out_tbl, output_xlsx)
   if (!is.null(output_docx)) export_to_word(out_tbl, output_docx)
 
-  # Report normality test results
+  # -- Report normality test results -----------------------------------------
   if (numeric_vars_tested > 0 && (isTRUE(consider_normality) || consider_normality == "FORCE")) {
     failed_pct <- round((numeric_vars_failed / numeric_vars_tested) * 100, 1)
-    message(sprintf("%d of %d numerical variables in your table failed normality tests (%s%%).", 
-                    numeric_vars_failed, numeric_vars_tested, failed_pct))
-    
-    if (consider_normality != "FORCE" && failed_pct > 50) {
-      message("Consider running with consider_normality = 'FORCE' if a majority of your variables fail normality for stylistic consistency.")
-    } else if (consider_normality == "FORCE" && failed_pct <= 50) {
-      message("Consider running with consider_normality = TRUE if a minority of your variables would fail normality for stylistic consistency.")
+
+    if (consider_normality == "FORCE") {
+      message(sprintf(
+        "%d of %d numerical variables failed normality tests at baseline (%s%%).",
+        numeric_vars_failed, numeric_vars_tested, failed_pct
+      ))
+      message("Note: consider_normality = 'FORCE' used; all numeric variables were displayed as median [IQR] and tested using nonparametric methods (Wilcoxon rank-sum for two groups or Kruskal–Wallis for ≥3 groups).")
+    } else {
+      message(sprintf(
+        "%d of %d numerical variables in your table failed normality tests (%s%%).",
+        numeric_vars_failed, numeric_vars_tested, failed_pct
+      ))
+
+      if (failed_pct > 50) {
+        message("Consider running with consider_normality = 'FORCE' if a majority of your variables fail normality for stylistic consistency.")
+      } else {
+        message("Consider running with consider_normality = TRUE if a minority of your variables would fail normality for stylistic consistency.")
+      }
     }
   }
 
