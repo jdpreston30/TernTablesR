@@ -8,7 +8,7 @@
 #' @param consider_normality Logical; if TRUE choose mean +- SD vs median [IQR].
 #' @param print_normality Logical; include Shapiro–Wilk p-values if TRUE.
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
-#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using AI-powered cleaning. Default is \code{TRUE}.
+#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{TRUE}.
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
 #' @return Tibble; one row per variable (multi-row for factors).
 #' @examples
@@ -259,11 +259,11 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
           suffix <- parts[2]
           
           # Clean the base name only
-          cleaned_base <- clean_variable_names(base_name, method = "rules")
+          cleaned_base <- clean_variable_names(base_name, method = "hybrid")
           cleaned_var <- paste0(cleaned_base, ": ", suffix)
         } else {
           # Clean the entire variable name
-          cleaned_var <- clean_variable_names(trimmed_var, method = "rules")
+          cleaned_var <- clean_variable_names(trimmed_var, method = "hybrid")
         }
         
         # Restore original padding

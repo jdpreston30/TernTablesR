@@ -263,18 +263,35 @@ clean_variable_names <- function(var_names,
 #' @keywords internal
 .capitalize_medical_term <- function(term) {
   
-  # Special cases that should remain uppercase
-  upper_terms <- c("IT", "CPB", "NICM", "ICM", "IABP", "VA", "LVEF", "CVP", 
-                   "MCS", "ICU", "LOS", "CRRT", "RRT", "UNOS", "PVR", "GFR",
-                   "WBC", "ALT", "AST", "BMI", "DBD", "DCD", "PHS", "PHM",
-                   "ACR", "LVAD", "RVAD", "ECMO")
-  
-  if (term %in% upper_terms) {
+  # Numbers should stay as-is
+  if (grepl("^[0-9.]+$", term)) {
     return(term)
   }
   
-  # Numbers should stay as-is
-  if (grepl("^[0-9.]+$", term)) {
+  # General rule: If term is all uppercase and 2+ characters, it's likely an abbreviation
+  # Keep it uppercase regardless of whether it's in our known list
+  if (nchar(term) >= 2 && term == toupper(term) && grepl("^[A-Z]+[0-9]*$", term)) {
+    return(term)
+  }
+  
+  # Also preserve mixed case abbreviations that end with uppercase (like "30d")
+  if (grepl("[A-Z]$", term) && nchar(term) <= 5) {
+    return(term)
+  }
+  
+  # Special cases that should remain uppercase (for backwards compatibility)
+  upper_terms <- c("IT", "CPB", "NICM", "ICM", "IABP", "VA", "LVEF", "CVP", 
+                   "MCS", "ICU", "LOS", "CRRT", "RRT", "UNOS", "PVR", "GFR",
+                   "WBC", "ALT", "AST", "BMI", "DBD", "DCD", "PHS", "PHM",
+                   "ACR", "LVAD", "RVAD", "ECMO", "AKI", "GCS", "ISS", "ED",
+                   "SBP", "DBP", "MAP", "HR", "OR", "SM", "IR", "BUN", "CRP",
+                   "ESR", "CBC", "BNP", "LDH", "PT", "PTT", "INR", "DNA", "RNA",
+                   "HIV", "HCV", "HBV", "CMV", "EBV", "COVID", "COPD", "CHF",
+                   "CAD", "PVD", "DM", "HTN", "AF", "VTE", "PE", "DVT", "MI",
+                   "CVA", "TIA", "CABG", "PCI", "ICD", "CRT", "EKG", "ECG",
+                   "CT", "MRI", "PET", "US", "CXR", "ECHO", "TEE", "TTE")
+  
+  if (term %in% upper_terms) {
     return(term)
   }
   
@@ -400,6 +417,63 @@ clean_variable_names <- function(var_names,
     ),
     stringsAsFactors = FALSE
   )
+}
+
+#' AI-powered cleaning using hybrid approach (rules + AI fallback)
+#' @keywords internal
+.clean_names_hybrid <- function(var_names, training_data, api_key, cache_results) {
+  
+  # First, try rule-based cleaning for all variables
+  rules_result <- .clean_names_rules(var_names, training_data)
+  
+  # Identify variables that might benefit from AI enhancement
+  # (e.g., variables where rules didn't change much or produced generic results)
+  needs_ai <- character(0)
+  ai_indices <- integer(0)
+  
+  for (i in seq_along(var_names)) {
+    original <- var_names[i]
+    rules_cleaned <- rules_result[i]
+    
+    # Check if rules cleaning was minimal or potentially inadequate
+    original_clean <- gsub("[_-]", " ", tolower(original))
+    rules_clean <- tolower(rules_cleaned)
+    
+    # If the rule-based result is too similar to original or very generic, try AI
+    similarity <- length(intersect(strsplit(original_clean, " ")[[1]], 
+                                  strsplit(rules_clean, " ")[[1]])) / 
+                 max(length(strsplit(original_clean, " ")[[1]]), 
+                     length(strsplit(rules_clean, " ")[[1]]))
+    
+    if (similarity > 0.8 || rules_cleaned %in% c("", " ", original)) {
+      needs_ai <- c(needs_ai, original)
+      ai_indices <- c(ai_indices, i)
+    }
+  }
+  
+  # If we have variables that need AI enhancement, try local AI
+  if (length(needs_ai) > 0) {
+    tryCatch({
+      if (.check_ollama_available()) {
+        message(sprintf("Using AI enhancement for %d variables with ollama", length(needs_ai)))
+        ai_results <- .clean_names_ai_local(needs_ai, training_data, cache_results, fallback_rules = FALSE)
+        
+        # Replace rules results with AI results for enhanced variables
+        for (i in seq_along(ai_indices)) {
+          idx <- ai_indices[i]
+          if (!is.na(ai_results[i]) && ai_results[i] != "") {
+            rules_result[idx] <- ai_results[i]
+          }
+        }
+      } else {
+        message("Ollama not available for AI enhancement, using rules-only results")
+      }
+    }, error = function(e) {
+      message("AI enhancement failed, using rules-only results: ", e$message)
+    })
+  }
+  
+  return(rules_result)
 }
 
 # Additional AI methods would go here (OpenAI, hybrid, etc.)
