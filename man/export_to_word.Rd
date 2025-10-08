@@ -4,12 +4,14 @@
 \alias{export_to_word}
 \title{Export TernTablesR output to a formatted Word document}
 \usage{
-export_to_word(tbl, filename)
+export_to_word(tbl, filename, round_intg = FALSE)
 }
 \arguments{
 \item{tbl}{A tibble created by ternG or ternD}
 
 \item{filename}{Output file path ending in .docx}
+
+\item{round_intg}{Logical; if TRUE, adds note about integer rounding. Default is FALSE.}
 }
 \description{
 Export TernTablesR output to a formatted Word document

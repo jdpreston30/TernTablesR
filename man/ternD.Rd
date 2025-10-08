@@ -13,7 +13,8 @@ ternD(
   consider_normality = FALSE,
   print_normality = FALSE,
   round_intg = FALSE,
-  clean_names = FALSE
+  smart_rename = FALSE,
+  insert_subheads = TRUE
 )
 }
 \arguments{
@@ -33,7 +34,9 @@ ternD(
 
 \item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
 
-\item{clean_names}{Logical; if \code{TRUE}, automatically cleans variable names for publication-ready output. Default is \code{FALSE}.}
+\item{smart_rename}{Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.}
+
+\item{insert_subheads}{Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.}
 }
 \value{
 Tibble; one row per variable (multi-row for factors).
