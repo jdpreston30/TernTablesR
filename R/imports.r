@@ -5,4 +5,5 @@
 #' @importFrom stats median quantile sd setNames
 #' @importFrom utils head read.csv
 #' @importFrom magrittr %>%
+#' @importFrom stringr str_extract
 NULL

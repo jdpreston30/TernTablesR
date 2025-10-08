@@ -20,7 +20,7 @@
 #' @param show_test Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
-#' @param clean_names Logical; if \code{TRUE}, automatically cleans variable names for publication-ready output. Default is \code{FALSE}.
+#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using AI-powered cleaning. Default is \code{TRUE}.
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
@@ -43,7 +43,7 @@ ternG <- function(data,
                   show_test = TRUE,
                   p_digits = 3,
                   round_intg = FALSE,
-                  clean_names = FALSE,
+                  smart_rename = TRUE,
                   insert_subheads = TRUE) {
 
   # Helper function for proper rounding (0.5 always rounds up)
@@ -505,15 +505,45 @@ ternG <- function(data,
     }
   }
 
-  # Apply variable name cleaning if requested
-  if (clean_names) {
+  # Apply smart variable name cleaning if requested
+  if (smart_rename) {
     # Source the cleaning function if not already loaded
     if (!exists("clean_variable_names")) {
       source(system.file("R", "clean_variable_names.r", package = "TernTablesR"))
     }
     
-    # Clean the variable names
-    out_tbl$Variable <- clean_variable_names(out_tbl$Variable, method = "rules")
+    # Clean variable names - handle both main variables and subheadings
+    for (i in seq_len(nrow(out_tbl))) {
+      current_var <- out_tbl$Variable[i]
+      
+      # Check if this is a subheading (has leading spaces)
+      if (grepl("^\\s+", current_var)) {
+        # Extract padding and clean the variable name part
+        padding <- stringr::str_extract(current_var, "^\\s+")
+        trimmed_var <- trimws(current_var)
+        
+        # For categorical variables with suffixes, clean only the base name
+        if (grepl(": [A-Za-z0-9]+$", trimmed_var)) {
+          # Split variable name and suffix
+          parts <- strsplit(trimmed_var, ": ")[[1]]
+          base_name <- parts[1]
+          suffix <- parts[2]
+          
+          # Clean the base name only
+          cleaned_base <- clean_variable_names(base_name, method = "rules")
+          cleaned_var <- paste0(cleaned_base, ": ", suffix)
+        } else {
+          # Clean the entire variable name
+          cleaned_var <- clean_variable_names(trimmed_var, method = "rules")
+        }
+        
+        # Restore original padding
+        out_tbl$Variable[i] <- paste0(padding, cleaned_var)
+      } else {
+        # This shouldn't happen with insert_subheads = TRUE, but handle it just in case
+        out_tbl$Variable[i] <- clean_variable_names(current_var, method = "rules")
+      }
+    }
   }
 
   return(out_tbl)
