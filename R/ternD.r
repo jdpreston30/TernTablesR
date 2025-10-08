@@ -8,7 +8,7 @@
 #' @param consider_normality Logical; if TRUE choose mean +- SD vs median [IQR].
 #' @param print_normality Logical; include Shapiro–Wilk p-values if TRUE.
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
-#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{TRUE}.
+#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
 #' @return Tibble; one row per variable (multi-row for factors).
 #' @examples
@@ -17,7 +17,7 @@
 ternD <- function(data, vars = NULL, exclude_vars = NULL,
                   output_xlsx = NULL, output_docx = NULL,
                   consider_normality = FALSE, print_normality = FALSE, 
-                  round_intg = FALSE, smart_rename = TRUE, insert_subheads = TRUE) {
+                  round_intg = FALSE, smart_rename = FALSE, insert_subheads = TRUE) {
   stopifnot(is.data.frame(data))
 
   # Helper function for proper rounding (0.5 always rounds up)
@@ -115,7 +115,9 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
       # Always use simple format for Y/N variables or when insert_subheads is FALSE
       # Otherwise use hierarchical format for multi-level categorical variables
       is_yes_no <- all(c("Y", "N") %in% sorted_levels)
-      use_hierarchical <- !is_yes_no && insert_subheads && length(sorted_levels) > 1
+      is_yes_no_full <- all(c("Yes", "No") %in% sorted_levels)
+      is_binary <- is_yes_no || is_yes_no_full
+      use_hierarchical <- !is_binary && insert_subheads && length(sorted_levels) > 1
       
       if (use_hierarchical) {
         # Create header row for the main variable
@@ -156,41 +158,30 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
         out <- dplyr::bind_rows(list(header_row), sub_rows)
       } else {
         # For Y/N variables or when insert_subheads=FALSE, use simple format with 2-space indentation
-        # For Y/N, show only the "Y" level; for others, show most common level
+        # For Y/N, show only the "Y" level; for Yes/No, show only "Yes"; for others, show most common level
         if (is_yes_no) {
           # Y/N variables: show only Y
           ref_level <- "Y"
+        } else if (is_yes_no_full) {
+          # Yes/No variables: show only Yes
+          ref_level <- "Yes"
+        } else {
+          # Other variables: show most common level
+          ref_level <- sorted_levels[1]  # Already sorted by frequency
+        }
+        
+        if (isTRUE(consider_normality)) {
+          rows <- list(tibble::tibble(
+            Variable = paste0("  ", var, ": ", ref_level),
+            Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
+          ))
+        } else {
           rows <- list(tibble::tibble(
             Variable = paste0("  ", var, ": ", ref_level),
             n_pct = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)"),
             Mean_SD = NA_character_,
             Median_IQR = NA_character_
           ))
-          if (isTRUE(consider_normality)) {
-            rows <- list(tibble::tibble(
-              Variable = paste0("  ", var, ": ", ref_level),
-              Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
-            ))
-          }
-        } else {
-          # Non-Y/N variables: show all levels (when insert_subheads=FALSE)
-          rows <- lapply(sorted_levels, function(level) {
-            n <- as.integer(tab[[level]])
-            p <- pct[[level]]
-            if (isTRUE(consider_normality)) {
-              tibble::tibble(
-                Variable = paste0("  ", var, ": ", level),
-                Summary  = paste0(n, " (", p, "%)")
-              )
-            } else {
-              tibble::tibble(
-                Variable = paste0("  ", var, ": ", level),
-                n_pct = paste0(n, " (", p, "%)"),
-                Mean_SD = NA_character_,
-                Median_IQR = NA_character_
-              )
-            }
-          })
         }
         out <- dplyr::bind_rows(rows)
       }

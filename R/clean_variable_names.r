@@ -306,10 +306,14 @@ clean_variable_names <- function(var_names,
   # Check if ollama is available
   if (!.check_ollama_available()) {
     if (fallback_rules) {
-      message("Ollama not available, falling back to rule-based cleaning")
+      message("Ollama not available - falling back to rule-based cleaning.")
+      message("To enable AI enhancement, install ollama:")
+      message("  macOS: brew install ollama && ollama serve && ollama pull llama3.2:1b")
+      message("  Other: Download from https://ollama.ai")
       return(.clean_names_rules(var_names, training_data))
     } else {
-      stop("Ollama not available and fallback_rules = FALSE")
+      stop("Ollama not available and fallback_rules = FALSE.\n",
+           "Install ollama (https://ollama.ai) or set fallback_rules = TRUE.")
     }
   }
   
@@ -352,10 +356,10 @@ clean_variable_names <- function(var_names,
 #' Check if ollama is available
 #' @keywords internal
 .check_ollama_available <- function() {
-  # Try to run ollama list command
+  # Try to run ollama list command and check exit code
   tryCatch({
-    system("ollama list", ignore.stdout = TRUE, ignore.stderr = TRUE)
-    return(TRUE)
+    exit_code <- system("ollama list", ignore.stdout = TRUE, ignore.stderr = TRUE)
+    return(exit_code == 0)  # Return TRUE only if command succeeded
   }, error = function(e) {
     return(FALSE)
   })
@@ -365,36 +369,61 @@ clean_variable_names <- function(var_names,
 #' @keywords internal
 .query_ollama_for_name <- function(var_name, training_data) {
   
-  # Create few-shot examples from training data
-  examples <- head(training_data, 5)
+  # Create comprehensive examples showing the cleaning pattern
+  examples <- rbind(
+    head(training_data, 3),
+    data.frame(
+      abbrev_name = c(
+        "demographics_age_tpx", "postop_ICU_LOS", "preop_temp_MCS", 
+        "recipient_BMI_calc", "donor_history_smoking", "operative_procedure_time",
+        "lab_values_creatinine", "outcome_30day_mortality", "score_MELD_calc"
+      ),
+      table_name = c(
+        "Age (years)", "ICU LOS (days)", "Mechanical Circulatory Support",
+        "Body Mass Index (kg/m²)", "Smoking History", "Procedure Time (minutes)",
+        "Creatinine (mg/dL)", "30-day Mortality", "MELD Score"
+      ),
+      stringsAsFactors = FALSE
+    )
+  )
+  
   example_text <- paste(
     sapply(1:nrow(examples), function(i) {
-      paste0("Input: ", examples$abbrev_name[i], "\nOutput: ", examples$table_name[i])
+      paste0(examples$abbrev_name[i], " → ", examples$table_name[i])
     }),
-    collapse = "\n\n"
+    collapse = "\n"
   )
   
-  # Construct prompt
+  # Construct improved prompt with clear rules
   prompt <- paste0(
-    "You are a medical variable name cleaner for research publications. ",
-    "Transform technical variable names into clean, publication-ready names. ",
-    "Follow these patterns:\n\n",
-    example_text,
-    "\n\nTransform this variable name following the same patterns:\n",
-    "Input: ", var_name,
-    "\nOutput:"
+    "Clean this medical variable name for publication. Follow these rules:\n",
+    "1. Remove junk prefixes (demographics_, postop_, preop_, lab_, etc.)\n",
+    "2. Expand abbreviations to full medical terms\n", 
+    "3. Add units in parentheses when obvious (years, days, kg/m², mg/dL)\n",
+    "4. Keep it concise and publication-ready\n",
+    "5. Preserve important medical abbreviations (ICU, MELD, etc.)\n\n",
+    "Examples:\n", example_text, "\n\n",
+    "Clean this: ", var_name, "\n",
+    "Answer with ONLY the cleaned name:"
   )
   
-  # Query ollama
+  # Query ollama  
   tryCatch({
-    cmd <- paste0("ollama run llama3.2 '", prompt, "'")
+    cmd <- paste0("ollama run llama3.2:1b '", prompt, "'")
     result <- system(cmd, intern = TRUE, ignore.stderr = TRUE)
     
     if (length(result) > 0) {
-      # Clean up the result
-      clean_result <- gsub("^Output:\\s*", "", result[1])
+      # Clean up the result - take first meaningful line
+      clean_result <- result[1]
+      clean_result <- gsub("^(Answer:|Output:|Clean name:|Cleaned:|→)\\s*", "", clean_result, ignore.case = TRUE)
+      clean_result <- trimws(clean_result)
       clean_result <- gsub("\\n.*", "", clean_result)  # Take only first line
-      return(clean_result)
+      clean_result <- gsub('"', '', clean_result)      # Remove quotes
+      
+      # Validate result isn't empty or the same as input
+      if (nchar(clean_result) > 0 && clean_result != var_name) {
+        return(clean_result)
+      }
     }
     
     return(NULL)
@@ -466,7 +495,8 @@ clean_variable_names <- function(var_names,
           }
         }
       } else {
-        message("Ollama not available for AI enhancement, using rules-only results")
+        message("Ollama not available for AI enhancement - using rules-only results.")
+        message("To enable AI features, install ollama: https://ollama.ai")
       }
     }, error = function(e) {
       message("AI enhancement failed, using rules-only results: ", e$message)

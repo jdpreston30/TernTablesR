@@ -20,7 +20,7 @@
 #' @param show_test Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
-#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{TRUE}.
+#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
@@ -43,7 +43,7 @@ ternG <- function(data,
                   show_test = TRUE,
                   p_digits = 3,
                   round_intg = FALSE,
-                  smart_rename = TRUE,
+                  smart_rename = FALSE,
                   insert_subheads = TRUE) {
 
   # Helper function for proper rounding (0.5 always rounds up)
@@ -146,11 +146,19 @@ ternG <- function(data,
       # Always use simple format for Y/N variables or when insert_subheads is FALSE
       # Otherwise use hierarchical format for categorical variables
       is_yes_no <- all(c("Y", "N") %in% colnames(tab))
-      use_simple_format <- is_yes_no || !insert_subheads
+      is_yes_no_full <- all(c("Yes", "No") %in% colnames(tab))
+      is_binary <- is_yes_no || is_yes_no_full
+      use_simple_format <- is_binary || !insert_subheads
       
       if (use_simple_format) {
-        # Simple format: single row for the most common level (or Y for Y/N)
-        ref_level <- if (is_yes_no) "Y" else names(sort(colSums(tab), decreasing = TRUE))[1]
+        # Simple format: single row for the most common level (or Y for Y/N, Yes for Yes/No)
+        if (is_yes_no) {
+          ref_level <- "Y"
+        } else if (is_yes_no_full) {
+          ref_level <- "Yes"
+        } else {
+          ref_level <- names(sort(colSums(tab), decreasing = TRUE))[1]
+        }
         result <- tibble(Variable = paste0("  ", var, ": ", ref_level))
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(

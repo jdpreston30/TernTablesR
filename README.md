@@ -10,6 +10,30 @@ You can install the development version of TernTablesR from GitHub:
 devtools::install_github("jdpreston30/TernTablesR")
 ```
 
+### 🤖 Optional: AI-Enhanced Variable Cleaning
+
+TernTablesR includes optional AI-powered variable name cleaning via `smart_rename = TRUE`. To use this feature, you'll need to install ollama (a free, local AI tool):
+
+**macOS:**
+```bash
+brew install ollama
+ollama serve
+ollama pull llama3.2:1b
+```
+
+**Windows/Linux:** Download from [ollama.ai](https://ollama.ai) and run:
+```bash
+ollama serve
+ollama pull llama3.2:1b
+```
+
+Once installed, you can use AI enhancement:
+```r
+ternG(data, group_var = "treatment", smart_rename = TRUE)
+```
+
+Without ollama, the package works normally with `smart_rename = FALSE` (default).
+
 ## 📦 Functions
 
 ### `ternG()`
