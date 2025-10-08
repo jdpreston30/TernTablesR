@@ -7,7 +7,7 @@
 #' @param data Tibble containing all variables.
 #' @param vars Character vector of variables to summarize. Defaults to all except \code{group_var} and \code{exclude_vars}.
 #' @param exclude_vars Character vector of variable(s) to exclude. \code{group_var} is automatically excluded.
-#' @param group_var Character, the grouping variable (factor or character with ≥2 levels).
+#' @param group_var Character, the grouping variable (factor or character with >=2 levels).
 #' @param force_ordinal Character vector of variables to treat as ordinal (i.e., use medians/IQR and nonparametric tests).
 #' @param group_order Optional character vector to specify a custom group level order.
 #' @param descriptive Logical; if \code{TRUE}, suppresses statistical tests and returns descriptive statistics only.
@@ -20,6 +20,8 @@
 #' @param show_test Logical; if \code{TRUE} (default), includes the statistical test name as a column in the output.
 #' @param p_digits Integer; number of decimal places for p-values (default 3).
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
+#' @param clean_names Logical; if \code{TRUE}, automatically cleans variable names for publication-ready output. Default is \code{FALSE}.
+#' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 #' p-values, test type, and optionally odds ratios and total summary column.
@@ -40,7 +42,9 @@ ternG <- function(data,
                   print_normality = FALSE,
                   show_test = TRUE,
                   p_digits = 3,
-                  round_intg = FALSE) {
+                  round_intg = FALSE,
+                  clean_names = FALSE,
+                  insert_subheads = TRUE) {
 
   # Helper function for proper rounding (0.5 always rounds up)
   round_up_half <- function(x, digits = 0) {
@@ -80,6 +84,27 @@ ternG <- function(data,
   numeric_vars_failed <- 0
 
   .summarize_var_internal <- function(df, var, force_ordinal = NULL, show_test = TRUE, round_intg = FALSE) {
+    
+    # Helper function to clean variable names for headers
+    .clean_variable_name_for_header <- function(var_name) {
+      # Remove common suffixes and clean up for display
+      clean_name <- var_name
+      clean_name <- gsub("_simplified$", "", clean_name)
+      clean_name <- gsub("_calc$", "", clean_name)
+      clean_name <- gsub("_tpx$", "", clean_name)
+      clean_name <- gsub("_", " ", clean_name)
+      clean_name <- tools::toTitleCase(clean_name)
+      
+      # Handle common abbreviations
+      clean_name <- gsub("\\bCod\\b", "Cause of Death", clean_name)
+      clean_name <- gsub("\\bDbd Dcd\\b", "Mode of Organ Donation", clean_name)
+      clean_name <- gsub("\\bPhm\\b", "Predicted Heart Mass", clean_name)
+      clean_name <- gsub("\\bPhs\\b", "PHS", clean_name)
+      clean_name <- gsub("\\bLvef\\b", "LVEF", clean_name)
+      
+      return(clean_name)
+    }
+    
     g <- df %>% filter(!is.na(.data[[var]]), !is.na(.data[[group_var]]))
     if (nrow(g) == 0) return(NULL)
     v <- g[[var]]
@@ -116,9 +141,17 @@ ternG <- function(data,
              error = reason)
       })
       
-      if (ncol(tab) == 2) {
-        ref_level <- if (all(c("Y", "N") %in% colnames(tab))) "Y" else names(sort(colSums(tab), decreasing = TRUE))[1]
-        result <- tibble(Variable = paste0(var, ": ", ref_level))
+      
+      # Determine if this should use simple format or hierarchical subheads
+      # Always use simple format for Y/N variables or when insert_subheads is FALSE
+      # Otherwise use hierarchical format for categorical variables
+      is_yes_no <- all(c("Y", "N") %in% colnames(tab))
+      use_simple_format <- is_yes_no || !insert_subheads
+      
+      if (use_simple_format) {
+        # Simple format: single row for the most common level (or Y for Y/N)
+        ref_level <- if (is_yes_no) "Y" else names(sort(colSums(tab), decreasing = TRUE))[1]
+        result <- tibble(Variable = paste0("  ", var, ": ", ref_level))
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(
             tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)"
@@ -164,9 +197,30 @@ ternG <- function(data,
           result$Total <- paste0(tab_total_n[ref_level], " (", tab_total_pct[ref_level], "%)")
         }
       } else {
-        # For multinomial variables (>2 levels), share the same p-value across all levels
-        rows <- lapply(colnames(tab), function(level) {
-          out <- tibble(Variable = paste0(var, ": ", level))
+        # Hierarchical format: header + indented sub-categories
+        # tab_total_n is already a vector of total counts per level
+        sorted_levels <- names(sort(tab_total_n, decreasing = TRUE))
+        
+        # Create header row for the main variable (no data, just variable name)
+        header_row <- tibble(Variable = paste0("  ", .clean_variable_name_for_header(var)))
+        for (g_lvl in group_levels) {
+          header_row[[group_labels[g_lvl]]] <- ""
+        }
+        header_row$p <- ""
+        if (show_test) {
+          header_row$test <- ""
+        }
+        if (OR_col) {
+          header_row$OR <- ""
+          header_row$OR_method <- ""
+        }
+        if (descriptive) {
+          header_row$Total <- ""
+        }
+        
+        # Create sub-category rows (indented)
+        sub_rows <- lapply(sorted_levels, function(level) {
+          out <- tibble(Variable = paste0("      ", level))
           for (g_lvl in group_levels) {
             val <- if (g_lvl %in% rownames(tab_n) && level %in% colnames(tab_n)) {
               paste0(tab_n[g_lvl, level], " (", tab_pct[g_lvl, level], "%)")
@@ -176,25 +230,35 @@ ternG <- function(data,
             out[[group_labels[g_lvl]]] <- val
           }
           
-          if (!is.null(test_result$error)) {
-            out$p <- paste0("NA (", test_result$error, ")")
+          # Only first sub-row gets p-value, others get "-"
+          if (level == sorted_levels[1]) {
+            if (!is.null(test_result$error)) {
+              out$p <- paste0("NA (", test_result$error, ")")
+            } else {
+              out$p <- fmt_p(test_result$p_value, p_digits)
+            }
+            if (show_test) {
+              out$test <- test_result$test_name
+            }
           } else {
-            out$p <- fmt_p(test_result$p_value, p_digits)
-          }
-          if (show_test) {
-            out$test <- test_result$test_name
+            out$p <- "-"
+            if (show_test) {
+              out$test <- "-"
+            }
           }
           
           if (OR_col) {
-            out$OR <- NA_character_
-            out$OR_method <- NA_character_
+            out$OR <- "-"
+            out$OR_method <- "-"
           }
           if (descriptive) {
             out$Total <- paste0(tab_total_n[level], " (", tab_total_pct[level], "%)")
           }
           out
         })
-        result <- bind_rows(rows)
+        
+        # Combine header and sub-rows
+        result <- bind_rows(list(header_row), sub_rows)
       }
       return(result)
     }
@@ -205,7 +269,7 @@ ternG <- function(data,
         Q1 = if (round_intg) round_up_half(quantile(.data[[var]], 0.25, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.25, na.rm = TRUE), 1),
         med = if (round_intg) round_up_half(median(.data[[var]], na.rm = TRUE), 0) else round(median(.data[[var]], na.rm = TRUE), 1),
         Q3 = if (round_intg) round_up_half(quantile(.data[[var]], 0.75, na.rm = TRUE), 0) else round(quantile(.data[[var]], 0.75, na.rm = TRUE), 1), .groups = "drop")
-      result <- tibble(Variable = var)
+      result <- tibble(Variable = paste0("  ", var))
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
         result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) {
@@ -320,7 +384,7 @@ ternG <- function(data,
       mean = mean(.data[[var]], na.rm = TRUE),
       sd = sd(.data[[var]], na.rm = TRUE), .groups = "drop")
 
-    result <- tibble(Variable = var)
+    result <- tibble(Variable = paste0("  ", var))
     for (g_lvl in group_levels) {
       val <- stats %>% filter(.data[[group_var]] == g_lvl)
       result[[group_labels[g_lvl]]] <- if (nrow(val) == 1) {
@@ -426,7 +490,7 @@ ternG <- function(data,
         "%d of %d numerical variables failed normality tests at baseline (%s%%).",
         numeric_vars_failed, numeric_vars_tested, failed_pct
       ))
-      message("Note: consider_normality = 'FORCE' used; treating all numeric variables as non-normal. All displayed as median [IQR] and tested using nonparametric methods (Wilcoxon rank-sum for two groups or Kruskal–Wallis for ≥3 groups).")
+      message("Note: consider_normality = 'FORCE' used; treating all numeric variables as non-normal. All displayed as median [IQR] and tested using nonparametric methods (Wilcoxon rank-sum for two groups or Kruskal-Wallis for >=3 groups).")
     } else {
       message(sprintf(
         "%d of %d numerical variables in your table failed normality tests (%s%%).",
@@ -439,6 +503,17 @@ ternG <- function(data,
         message("Consider running with consider_normality = TRUE if a minority of your variables would fail normality for stylistic consistency.")
       }
     }
+  }
+
+  # Apply variable name cleaning if requested
+  if (clean_names) {
+    # Source the cleaning function if not already loaded
+    if (!exists("clean_variable_names")) {
+      source(system.file("R", "clean_variable_names.r", package = "TernTablesR"))
+    }
+    
+    # Clean the variable names
+    out_tbl$Variable <- clean_variable_names(out_tbl$Variable, method = "rules")
   }
 
   return(out_tbl)

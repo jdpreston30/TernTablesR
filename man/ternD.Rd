@@ -12,7 +12,8 @@ ternD(
   output_docx = NULL,
   consider_normality = FALSE,
   print_normality = FALSE,
-  round_intg = FALSE
+  round_intg = FALSE,
+  clean_names = FALSE
 )
 }
 \arguments{
@@ -26,11 +27,13 @@ ternD(
 
 \item{output_docx}{Optional Word filename.}
 
-\item{consider_normality}{Logical; if TRUE choose mean±SD vs median [IQR].}
+\item{consider_normality}{Logical; if TRUE choose mean +- SD vs median [IQR].}
 
 \item{print_normality}{Logical; include Shapiro–Wilk p-values if TRUE.}
 
 \item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
+
+\item{clean_names}{Logical; if \code{TRUE}, automatically cleans variable names for publication-ready output. Default is \code{FALSE}.}
 }
 \value{
 Tibble; one row per variable (multi-row for factors).

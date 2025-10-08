@@ -35,16 +35,16 @@ fmt_p <- function(p, digits = 3) {
   return(sprintf(paste0("%.", digits, "f"), p_rounded))
 }
 
-#' Format a mean ± SD string
+#' Format a mean  +-  SD string
 #'
 #' @param mean Mean value
 #' @param sd Standard deviation
-#' @return Formatted string "mean ± sd"
+#' @return Formatted string "mean  +-  sd"
 #' @export
 format_val <- function(mean, sd) {
   paste0(
     formatC(mean, format = "f", digits = 1),
-    " ± ",
+    "  +-  ",
     formatC(sd, format = "f", digits = 1)
   )
 }

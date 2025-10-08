@@ -1,0 +1,91 @@
+abbrev_name,table_name
+demographics_age_tpx,Age (years)
+demographics_race: Asian,Asian
+demographics_race: Black,Black
+demographics_race: Hispanic,Hispanic
+demographics_race: White,White
+demographics_sex: Male,Male
+demographics_BMI,Body Mass Index (kg/m²)
+comorbidities_smoking_hx: Y,Smoking History
+comorbidities_DM: Y,Diabetes Mellitus
+comorbidities_prior_cardiac_surg: Y,Prior Cardiac Surgery
+recipient_NICM_ICM_cong: Congenital,Congenital
+recipient_NICM_ICM_cong: ICM,Ischemic Cardiomyopathy
+recipient_NICM_ICM_cong: NICM,Non-Ischemic Cardiomyopathy
+preop_temp_MCS: Y,Mechanical Circulatory Support
+preop_IABP: Y,Intra-Aortic Balloon Pump
+preop_imeplla5.5: Y,Impella 5.5
+preop_VA_ECMO: Y,VA ECMO
+preop_LVAD: Y,LVAD
+recipient_UNOS_status,UNOS Listing Status
+preop_PVR,PVR (Wood units)
+rx_preop_inotrope: Y,Inotrope Requirement
+rx_preop_amiodarone: Y,Amiodarone‡
+preop_RADIAL_calc,RADIAL Score
+rx_preop_ASA: Y,ASA
+preop_labs_albumin,Albumin (g/dL)
+preop_labs_alkphos,Alkaline Phosphatase (U/L)
+preop_labs_ALT,ALT (U/L)
+preop_labs_AST,AST (U/L)
+preop_labs_bilirubin,Bilirubin (g/dL)
+preop_labs_creatinine,Creatinine (mg/dL)
+preop_labs_GFR,GFR (mL/min/1.73 m²)
+preop_labs_Hgb,Hemoglobin (g/dL)
+preop_labs_Plt,Platelets (10³/µL)
+preop_labs_sodium,Sodium (mmol/L)
+preop_labs_WBC,WBC (10³/µL)
+donor_age,Age (years)
+donor_sex: Male,Male
+donor_sex_mismatch: Y,Donor/Recipient Sex Mismatch
+donor_PHM_calc,Predicted Heart Mass
+donor_LVEF,LVEF (%)
+donor_drug_use: Y,Drug Use
+donor_PHS_risk: Y,PHS Increased Risk
+donor_DBD_DCD: DBD,DBD
+donor_COD_simplified: Anoxia,Anoxia
+donor_COD_simplified: Asphyxiation,Asphyxiation
+donor_COD_simplified: Cardiovascular,Cardiovascular
+donor_COD_simplified: CVA,Cerebrovascular Accident
+donor_COD_simplified: Drug Overdose,Drug Overdose
+donor_COD_simplified: Head Trauma,Head Trauma
+operative_IT_minutes,Ischemic Time (minutes)
+operative_CPB_minutes,CPB Time (minutes)
+postop_LVEF_median,LVEF
+postop_CVP,CVP
+postop_cardiac_index,Cardiac Index
+postop_inotrope_score,Inotrope Score
+postop_MCS_IABP: Y,Intra-Aortic Balloon Pump
+postop_VA_ECMO: Y,VA ECMO
+postop_MCS_Impella5.5: Y,Impella 5.5
+postop_MCS_RVAD: Y,RVAD
+postop_ICU_LOS,ICU LOS (days)
+postop_CRRT: Y,Dialysis Needed
+postop_stroke: Y,Cerebrovascular Accident
+postop_30_day_LVEF,LVEF at 30 days (%)
+postop_hospital_LOS,Total Hospital LOS (days)
+ACR_2R_or_greater: Y,≥2R Acute Cellular Rejection
+survival_30: Y,30-day Survival
+survival_90: Y,90-day Survival
+survival: Y,Survival
+survival_days,Survival (days)
+operative_IT_minutes,Ischemic Time (minutes)
+operative_CPB_minutes,CPB Time (minutes)
+postop_LVEF_median,LVEF
+postop_CVP,CVP
+postop_cardiac_index,Cardiac Index
+postop_inotrope_score,Inotrope Score
+postop_MCS_IABP: Y,Intra-Aortic Balloon Pump
+postop_VA_ECMO: Y,VA ECMO
+postop_MCS_Impella5.5: Y,Impella 5.5
+postop_MCS_RVAD: Y,RVAD
+postop_ICU_LOS,ICU LOS (days)
+postop_RRT_needed: Y,RRT Needed
+postop_CRRT: Y,CRRT
+postop_stroke: Y,Stroke
+postop_30_day_LVEF,LVEF at 30 days (%)
+postop_hospital_LOS,Hospital LOS (days)
+ACR_2R_or_greater: Y,≥2R Acute Cellular Rejection
+survival_30: Y,30-day Survival
+survival_90: Y,90-day Survival
+survival: Y,Survival
+survival_days,Survival (days)

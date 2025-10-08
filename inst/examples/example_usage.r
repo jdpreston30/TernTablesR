@@ -1,19 +1,20 @@
-# If testing locally:
-# Requires synthetic_data.csv located in inst/examples/
-{
+# TernTablesR Example Usage
+# 
+# First install the package fresh
+if ("TernTablesR" %in% rownames(installed.packages())) {
+  remove.packages("TernTablesR")
+}
+
+# Install fresh version
+system("R CMD INSTALL .", wait = TRUE)
+
+# Load the freshly installed package
+library(TernTablesR)
 library(dplyr)
 library(readr)
-library(tibble)
-library(stats)
-library(writexl)
-library(officer)
-library(flextable)
-source("R/ternG.r")
-source("R/export_to_word.r")
-source("R/utils_format.r")
-}
+
 # Import and structure data
-demographics_i <- read_csv("inst/examples/synthetic_data.csv")  %>%
+demographics_i <- read_csv("inst/examples/synthetic_data.csv") %>%
     mutate(
       survived = factor(survived),
       index_group = factor(index_group),
@@ -30,7 +31,9 @@ demographics_i <- read_csv("inst/examples/synthetic_data.csv")  %>%
       surv_hosp_LOS = as.integer(surv_hosp_LOS),
       Age = as.integer(Age)
     )
+
 # Run TernG (2-level comparison using index_operative)
+cat("Running ternG with insert_subheads = TRUE...\n")
 Tern2v <- ternG(
   data = demographics_i,
   exclude_vars = c("ID"),
@@ -41,19 +44,28 @@ Tern2v <- ternG(
   output_docx = "inst/examples/Outputs/summary_oper_vs_nonop.docx",
   OR_col = FALSE,
   consider_normality = "FORCE",
-  show_test = FALSE
+  show_test = FALSE,
+  insert_subheads = TRUE
 )
 
+print(Tern2v)
+
 # Run TernG (3-level comparison using grade)
+cat("\nRunning ternG with 3-level comparison...\n")
 Tern3v <- ternG(
   data = demographics_i,
   exclude_vars = c("ID"),
   group_var = "grade",
-  force_ordinal = c("ISS", "Age"),
-  group_order = c(3, 4, 5),
-  output_xlsx = "tern_summary_3grade.xlsx",
-  output_docx = "tern_summary_3grade.docx",
+  force_ordinal = c("ISS", "GCS"),
   OR_col = FALSE,
   consider_normality = "FORCE",
-  show_test = FALSE
+  show_test = FALSE,
+  insert_subheads = TRUE
 )
+
+print(Tern3v)
+
+cat("\n✅ Examples completed successfully!\n")
+cat("Generated files:\n")
+cat("- inst/examples/Outputs/summary_oper_vs_nonop.xlsx\n")
+cat("- inst/examples/Outputs/summary_oper_vs_nonop.docx\n")

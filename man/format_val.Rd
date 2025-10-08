@@ -2,7 +2,7 @@
 % Please edit documentation in R/utils_format.r
 \name{format_val}
 \alias{format_val}
-\title{Format a mean ± SD string}
+\title{Format a mean  +-  SD string}
 \usage{
 format_val(mean, sd)
 }
@@ -12,8 +12,8 @@ format_val(mean, sd)
 \item{sd}{Standard deviation}
 }
 \value{
-Formatted string "mean ± sd"
+Formatted string "mean  +-  sd"
 }
 \description{
-Format a mean ± SD string
+Format a mean  +-  SD string
 }

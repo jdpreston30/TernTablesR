@@ -22,7 +22,8 @@ Imports:
     writexl,
     readr,
     stringr,
-    stats
+    stats,
+    magrittr
 Suggests:
     testthat,
     knitr,

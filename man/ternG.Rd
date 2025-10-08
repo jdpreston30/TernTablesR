@@ -20,7 +20,8 @@ ternG(
   print_normality = FALSE,
   show_test = TRUE,
   p_digits = 3,
-  round_intg = FALSE
+  round_intg = FALSE,
+  clean_names = FALSE
 )
 }
 \arguments{
@@ -30,7 +31,7 @@ ternG(
 
 \item{exclude_vars}{Character vector of variable(s) to exclude. \code{group_var} is automatically excluded.}
 
-\item{group_var}{Character, the grouping variable (factor or character with ≥2 levels).}
+\item{group_var}{Character, the grouping variable (factor or character with >=2 levels).}
 
 \item{force_ordinal}{Character vector of variables to treat as ordinal (i.e., use medians/IQR and nonparametric tests).}
 
@@ -55,6 +56,8 @@ ternG(
 \item{p_digits}{Integer; number of decimal places for p-values (default 3).}
 
 \item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
+
+\item{clean_names}{Logical; if \code{TRUE}, automatically cleans variable names for publication-ready output. Default is \code{FALSE}.}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
