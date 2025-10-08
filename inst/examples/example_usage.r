@@ -33,7 +33,7 @@ demographics_i <- read_csv("inst/examples/synthetic_data.csv") %>%
     )
 
 # Run TernG (2-level comparison using index_operative)
-cat("Running ternG with insert_subheads = TRUE and smart_rename = TRUE...\n")
+cat("Running ternG with insert_subheads = TRUE and smart_rename = FALSE (default)...\n")
 Tern2v <- ternG(
   data = demographics_i,
   exclude_vars = c("ID"),
@@ -46,13 +46,13 @@ Tern2v <- ternG(
   consider_normality = "FORCE",
   show_test = FALSE,
   insert_subheads = TRUE,
-  smart_rename = TRUE
+  smart_rename = FALSE  # Changed to FALSE to match new default
 )
 
 print(Tern2v)
 
 # Run TernG (3-level comparison using grade)
-cat("\nRunning ternG with 3-level comparison and smart_rename = TRUE...\n")
+cat("\nRunning ternG with 3-level comparison and smart_rename = FALSE (default)...\n")
 Tern3v <- ternG(
   data = demographics_i,
   exclude_vars = c("ID"),
@@ -62,7 +62,7 @@ Tern3v <- ternG(
   consider_normality = "FORCE",
   show_test = FALSE,
   insert_subheads = TRUE,
-  smart_rename = TRUE
+  smart_rename = FALSE  # Changed to FALSE to match new default
 )
 
 print(Tern3v)
