@@ -48,7 +48,14 @@ export_to_word <- function(tbl, filename, round_intg = FALSE) {
   
   # Add footer row
   footer_row <- modified_tbl[1,]
-  footer_row[1,] <- ""
+  # Set appropriate empty values for each column type
+  for (j in seq_along(footer_row)) {
+    if (is.numeric(footer_row[[j]])) {
+      footer_row[[j]][1] <- NA_real_
+    } else {
+      footer_row[[j]][1] <- ""
+    }
+  }
   footer_row[[1]][1] <- footer_text
   modified_tbl <- rbind(modified_tbl, footer_row)
   footer_row_index <- nrow(modified_tbl)
