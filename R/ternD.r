@@ -126,6 +126,7 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
             Variable = paste0("  ", .clean_variable_name_for_header(var)),
             Summary = ""
           )
+          if (print_normality) header_row$SW_p <- NA_real_
         } else {
           header_row <- tibble::tibble(
             Variable = paste0("  ", .clean_variable_name_for_header(var)),
@@ -133,6 +134,7 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
             Mean_SD = "",
             Median_IQR = ""
           )
+          if (print_normality) header_row$SW_p <- NA_real_
         }
         
         # Create sub-category rows (indented)
@@ -140,17 +142,21 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
           n <- as.integer(tab[[level]])
           p <- pct[[level]]
           if (isTRUE(consider_normality)) {
-            tibble::tibble(
+            row <- tibble::tibble(
               Variable = paste0("      ", level),
               Summary  = paste0(n, " (", p, "%)")
             )
+            if (print_normality) row$SW_p <- NA_real_
+            return(row)
           } else {
-            tibble::tibble(
+            row <- tibble::tibble(
               Variable = paste0("      ", level),
               n_pct = paste0(n, " (", p, "%)"),
               Mean_SD = NA_character_,
               Median_IQR = NA_character_
             )
+            if (print_normality) row$SW_p <- NA_real_
+            return(row)
           }
         })
         
@@ -171,23 +177,23 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
         }
         
         if (isTRUE(consider_normality)) {
-          rows <- list(tibble::tibble(
+          row <- tibble::tibble(
             Variable = paste0("  ", var, ": ", ref_level),
             Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
-          ))
+          )
+          if (print_normality) row$SW_p <- NA_real_
+          rows <- list(row)
         } else {
-          rows <- list(tibble::tibble(
+          row <- tibble::tibble(
             Variable = paste0("  ", var, ": ", ref_level),
             n_pct = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)"),
             Mean_SD = NA_character_,
             Median_IQR = NA_character_
-          ))
+          )
+          if (print_normality) row$SW_p <- NA_real_
+          rows <- list(row)
         }
         out <- dplyr::bind_rows(rows)
-      }
-      if (print_normality) {
-        # Not applicable for categorical
-        out$SW_p <- NA_real_
       }
       return(out)
     }
