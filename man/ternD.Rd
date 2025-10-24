@@ -8,6 +8,7 @@ ternD(
   data,
   vars = NULL,
   exclude_vars = NULL,
+  force_ordinal = NULL,
   output_xlsx = NULL,
   output_docx = NULL,
   consider_normality = FALSE,
@@ -20,30 +21,75 @@ ternD(
 \arguments{
 \item{data}{Tibble with variables.}
 
-\item{vars}{Character vector of variables to summarize. Defaults to all.}
+\item{vars}{Character vector of variables to summarize. Defaults to all except \code{exclude_vars}.}
 
-\item{exclude_vars}{Character vector to exclude.}
+\item{exclude_vars}{Character vector to exclude from the summary.}
 
-\item{output_xlsx}{Optional Excel filename.}
+\item{force_ordinal}{Character vector of variables to treat as ordinal (i.e., use median [IQR]) 
+regardless of the \code{consider_normality} setting. This parameter takes priority over 
+normality testing when \code{consider_normality = TRUE}.}
 
-\item{output_docx}{Optional Word filename.}
+\item{output_xlsx}{Optional Excel filename to export the table.}
 
-\item{consider_normality}{Logical; if TRUE choose mean +- SD vs median [IQR].}
+\item{output_docx}{Optional Word filename to export the table.}
 
-\item{print_normality}{Logical; include Shapiro–Wilk p-values if TRUE.}
+\item{consider_normality}{Logical; if \code{TRUE}, uses Shapiro-Wilk test to choose between 
+mean ± SD (for normal data) vs median [IQR] (for non-normal data) for numeric variables. 
+If \code{FALSE}, defaults to mean ± SD for all numeric variables unless specified in 
+\code{force_ordinal}.}
 
-\item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
+\item{print_normality}{Logical; if \code{TRUE}, includes Shapiro-Wilk p-values as an 
+additional column in the output.}
 
-\item{smart_rename}{Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.}
+\item{round_intg}{Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard 
+deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.}
 
-\item{insert_subheads}{Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.}
+\item{smart_rename}{Logical; if \code{TRUE}, automatically cleans variable names and 
+subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based 
+cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.}
+
+\item{insert_subheads}{Logical; if \code{TRUE}, creates hierarchical structure with headers 
+and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, 
+uses simple flat format. Default is \code{TRUE}.}
 }
 \value{
-Tibble; one row per variable (multi-row for factors).
+A tibble with one row per variable (multi-row for factors), containing:
+\describe{
+  \item{Variable}{Variable names with appropriate indentation}
+  \item{Summary}{Summary statistics (mean ± SD, median [IQR], or n (\%) as appropriate)}
+  \item{SW_p}{Shapiro-Wilk p-values (only if \code{print_normality = TRUE})}
+}
 }
 \description{
-Generate descriptive summary table (optionally normality-aware)
+Creates a descriptive summary table with a single "Summary" column format.
+For numeric variables, the default behavior is to show mean ± SD, but this
+can be modified using the \code{consider_normality} and \code{force_ordinal} parameters.
+}
+\details{
+The function always returns a tibble with a single "Summary" column format, regardless of the
+\code{consider_normality} setting. The behavior for numeric variables follows this priority:
+\enumerate{
+  \item Variables in \code{force_ordinal}: Always use median [IQR]
+  \item When \code{consider_normality = TRUE}: Use Shapiro-Wilk test to choose format
+  \item When \code{consider_normality = FALSE}: Default to mean ± SD
+}
+
+For categorical variables, the function shows frequencies and percentages. When 
+\code{insert_subheads = TRUE}, multi-level categorical variables are displayed with 
+hierarchical formatting (main variable as header, levels as indented sub-rows), except 
+for binary Y/N variables which use simple formatting.
 }
 \examples{
-# ternD(mtcars, consider_normality = TRUE, print_normality = TRUE)
+# Basic usage with default mean ± SD for numeric variables
+ternD(mtcars)
+
+# Use normality testing to choose summary format
+ternD(mtcars, consider_normality = TRUE)
+
+# Force specific variables to use median [IQR]
+ternD(mtcars, force_ordinal = c("hp", "qsec"), consider_normality = TRUE)
+
+# Export to Word document
+ternD(mtcars, output_docx = "descriptive_table.docx", consider_normality = TRUE)
+
 }

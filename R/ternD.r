@@ -1,19 +1,66 @@
 #' Generate descriptive summary table (optionally normality-aware)
 #'
+#' Creates a descriptive summary table with a single "Summary" column format.
+#' For numeric variables, the default behavior is to show mean ± SD, but this
+#' can be modified using the \code{consider_normality} and \code{force_ordinal} parameters.
+#'
 #' @param data Tibble with variables.
-#' @param vars Character vector of variables to summarize. Defaults to all.
-#' @param exclude_vars Character vector to exclude.
-#' @param force_ordinal Character vector of variables to treat as ordinal (i.e., use medians/IQR) even when consider_normality = TRUE.
-#' @param output_xlsx Optional Excel filename.
-#' @param output_docx Optional Word filename.
-#' @param consider_normality Logical; if TRUE choose mean +- SD vs median [IQR].
-#' @param print_normality Logical; include Shapiro–Wilk p-values if TRUE.
-#' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
-#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.
-#' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
-#' @return Tibble; one row per variable (multi-row for factors).
+#' @param vars Character vector of variables to summarize. Defaults to all except \code{exclude_vars}.
+#' @param exclude_vars Character vector to exclude from the summary.
+#' @param force_ordinal Character vector of variables to treat as ordinal (i.e., use median [IQR]) 
+#'   regardless of the \code{consider_normality} setting. This parameter takes priority over 
+#'   normality testing when \code{consider_normality = TRUE}.
+#' @param output_xlsx Optional Excel filename to export the table.
+#' @param output_docx Optional Word filename to export the table.
+#' @param consider_normality Logical; if \code{TRUE}, uses Shapiro-Wilk test to choose between 
+#'   mean ± SD (for normal data) vs median [IQR] (for non-normal data) for numeric variables. 
+#'   If \code{FALSE}, defaults to mean ± SD for all numeric variables unless specified in 
+#'   \code{force_ordinal}.
+#' @param print_normality Logical; if \code{TRUE}, includes Shapiro-Wilk p-values as an 
+#'   additional column in the output.
+#' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard 
+#'   deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
+#' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and 
+#'   subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based 
+#'   cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.
+#' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers 
+#'   and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, 
+#'   uses simple flat format. Default is \code{TRUE}.
+#'
+#' @details
+#' The function always returns a tibble with a single "Summary" column format, regardless of the
+#' \code{consider_normality} setting. The behavior for numeric variables follows this priority:
+#' \enumerate{
+#'   \item Variables in \code{force_ordinal}: Always use median [IQR]
+#'   \item When \code{consider_normality = TRUE}: Use Shapiro-Wilk test to choose format
+#'   \item When \code{consider_normality = FALSE}: Default to mean ± SD
+#' }
+#'
+#' For categorical variables, the function shows frequencies and percentages. When 
+#' \code{insert_subheads = TRUE}, multi-level categorical variables are displayed with 
+#' hierarchical formatting (main variable as header, levels as indented sub-rows), except 
+#' for binary Y/N variables which use simple formatting.
+#'
+#' @return A tibble with one row per variable (multi-row for factors), containing:
+#' \describe{
+#'   \item{Variable}{Variable names with appropriate indentation}
+#'   \item{Summary}{Summary statistics (mean ± SD, median [IQR], or n (\%) as appropriate)}
+#'   \item{SW_p}{Shapiro-Wilk p-values (only if \code{print_normality = TRUE})}
+#' }
+#'
 #' @examples
-#' # ternD(mtcars, consider_normality = TRUE, print_normality = TRUE)
+#' # Basic usage with default mean ± SD for numeric variables
+#' ternD(mtcars)
+#' 
+#' # Use normality testing to choose summary format
+#' ternD(mtcars, consider_normality = TRUE)
+#' 
+#' # Force specific variables to use median [IQR]
+#' ternD(mtcars, force_ordinal = c("hp", "qsec"), consider_normality = TRUE)
+#' 
+#' # Export to Word document
+#' ternD(mtcars, output_docx = "descriptive_table.docx", consider_normality = TRUE)
+#' 
 #' @export
 ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
                   output_xlsx = NULL, output_docx = NULL,
@@ -93,19 +140,9 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
       tab <- table(v, useNA = "no")
       if (length(tab) == 0) {
         # all missing
-        if (isTRUE(consider_normality)) {
-          out <- tibble::tibble(Variable = paste0("  ", var), Summary = "0 (0%)")
-          if (print_normality) out$SW_p <- NA_real_
-          return(out)
-        } else {
-          out <- tibble::tibble(
-            Variable = paste0("  ", var),
-            n_pct = "0 (0%)",
-            Mean_SD = NA_character_,
-            Median_IQR = NA_character_
-          )
-          return(out)
-        }
+        out <- tibble::tibble(Variable = paste0("  ", var), Summary = "0 (0%)")
+        if (print_normality) out$SW_p <- NA_real_
+        return(out)
       }
       pct <- round(100 * prop.table(tab))
       
@@ -122,43 +159,22 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
       
       if (use_hierarchical) {
         # Create header row for the main variable
-        if (isTRUE(consider_normality)) {
-          header_row <- tibble::tibble(
-            Variable = paste0("  ", .clean_variable_name_for_header(var)),
-            Summary = ""
-          )
-          if (print_normality) header_row$SW_p <- NA_real_
-        } else {
-          header_row <- tibble::tibble(
-            Variable = paste0("  ", .clean_variable_name_for_header(var)),
-            n_pct = "",
-            Mean_SD = "",
-            Median_IQR = ""
-          )
-          if (print_normality) header_row$SW_p <- NA_real_
-        }
+        header_row <- tibble::tibble(
+          Variable = paste0("  ", .clean_variable_name_for_header(var)),
+          Summary = ""
+        )
+        if (print_normality) header_row$SW_p <- NA_real_
         
         # Create sub-category rows (indented)
         sub_rows <- lapply(sorted_levels, function(level) {
           n <- as.integer(tab[[level]])
           p <- pct[[level]]
-          if (isTRUE(consider_normality)) {
-            row <- tibble::tibble(
-              Variable = paste0("      ", level),
-              Summary  = paste0(n, " (", p, "%)")
-            )
-            if (print_normality) row$SW_p <- NA_real_
-            return(row)
-          } else {
-            row <- tibble::tibble(
-              Variable = paste0("      ", level),
-              n_pct = paste0(n, " (", p, "%)"),
-              Mean_SD = NA_character_,
-              Median_IQR = NA_character_
-            )
-            if (print_normality) row$SW_p <- NA_real_
-            return(row)
-          }
+          row <- tibble::tibble(
+            Variable = paste0("      ", level),
+            Summary  = paste0(n, " (", p, "%)")
+          )
+          if (print_normality) row$SW_p <- NA_real_
+          return(row)
         })
         
         # Combine header and sub-rows
@@ -177,23 +193,12 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
           ref_level <- sorted_levels[1]  # Already sorted by frequency
         }
         
-        if (isTRUE(consider_normality)) {
-          row <- tibble::tibble(
-            Variable = paste0("  ", var, ": ", ref_level),
-            Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
-          )
-          if (print_normality) row$SW_p <- NA_real_
-          rows <- list(row)
-        } else {
-          row <- tibble::tibble(
-            Variable = paste0("  ", var, ": ", ref_level),
-            n_pct = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)"),
-            Mean_SD = NA_character_,
-            Median_IQR = NA_character_
-          )
-          if (print_normality) row$SW_p <- NA_real_
-          rows <- list(row)
-        }
+        row <- tibble::tibble(
+          Variable = paste0("  ", var, ": ", ref_level),
+          Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
+        )
+        if (print_normality) row$SW_p <- NA_real_
+        rows <- list(row)
         out <- dplyr::bind_rows(rows)
       }
       return(out)
@@ -204,36 +209,28 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
     # compute normality p (even if consider_normality = FALSE, we may print it)
     sw <- if (print_normality || consider_normality) shapiro_p(x) else NA_real_
 
-    if (isTRUE(consider_normality)) {
-      # Check if variable is forced to be ordinal
-      if (!is.null(force_ordinal) && var %in% force_ordinal) {
-        # Force ordinal: use median/IQR regardless of normality
-        summary_str <- fmt_median_iqr(x)
+    # Check if variable is forced to be ordinal
+    if (!is.null(force_ordinal) && var %in% force_ordinal) {
+      # Force ordinal: use median/IQR regardless of consider_normality setting
+      summary_str <- fmt_median_iqr(x)
+    } else if (isTRUE(consider_normality)) {
+      # choose mean +- SD if normal; else median [IQR]
+      if (!is.na(sw) && sw >= 0.05) {
+        summary_str <- fmt_mean_sd(x)
       } else {
-        # choose mean +- SD if normal; else median [IQR]
-        if (!is.na(sw) && sw >= 0.05) {
-          summary_str <- fmt_mean_sd(x)
-        } else {
-          summary_str <- fmt_median_iqr(x)
-        }
+        summary_str <- fmt_median_iqr(x)
       }
-      out <- tibble::tibble(
-        Variable = paste0("  ", var),
-        Summary  = summary_str
-      )
-      if (print_normality) out$SW_p <- sw
-      return(out)
     } else {
-      # old behavior: keep separate columns
-      out <- tibble::tibble(
-        Variable = paste0("  ", var),
-        n_pct = NA_character_,
-        Mean_SD = fmt_mean_sd(x),
-        Median_IQR = fmt_median_iqr(x)
-      )
-      if (print_normality) out$SW_p <- sw
-      return(out)
+      # Default behavior when consider_normality = FALSE: use mean ± SD
+      summary_str <- fmt_mean_sd(x)
     }
+    
+    out <- tibble::tibble(
+      Variable = paste0("  ", var),
+      Summary  = summary_str
+    )
+    if (print_normality) out$SW_p <- sw
+    return(out)
   }
 
   out_tbl <- dplyr::bind_rows(lapply(vars, function(v) summarize_variable(data, v)))

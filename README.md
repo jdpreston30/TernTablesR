@@ -88,11 +88,13 @@ ternG(
 
 ### `ternD()`
 
-Generates **descriptive-only** summary tables without group comparisons. Useful for baseline cohort description or single-group studies.
+Generates **descriptive-only** summary tables without group comparisons. Uses a single "Summary" column format for clean, publication-ready output. Useful for baseline cohort description or single-group studies.
 
-- **Continuous variables**: Mean ± SD  
-- **Ordinal variables** (defined via `force_ordinal`): Median [IQR]  
-- **Categorical variables**: Counts (%)
+**Summary format behavior**:
+- **Default behavior** (`consider_normality = FALSE`): Mean ± SD for numeric variables
+- **Normality-aware** (`consider_normality = TRUE`): Shapiro-Wilk test determines mean ± SD vs median [IQR]
+- **Force ordinal** (`force_ordinal`): Always shows median [IQR] for specified variables, regardless of other settings
+- **Categorical variables**: Counts (%) with optional hierarchical formatting
 
 ## 📝 Example
 
@@ -101,6 +103,7 @@ ternD(
   data = your_data,
   exclude_vars = c("ID"),
   force_ordinal = c("severity_score", "stage"),
+  consider_normality = TRUE,
   output_xlsx = "summary_descriptive.xlsx",
   output_docx = "summary_descriptive.docx"
 )
@@ -111,8 +114,8 @@ ternD(
 ## 📤 Output
 
 - Returns a tibble with:
-  - Variable name  
-  - Summary statistics (per group if using `ternG()`, single overall row if using `ternD()`)  
+  - Variable name with appropriate indentation
+  - Summary statistics in a single "Summary" column (per group if using `ternG()`, single overall summary if using `ternD()`)  
   - p-value and test name (`ternG()` only)
   - Odds ratios with 95% confidence intervals (for Chi squared and Fisher's) (Optional via OR_col argument)
 - Optionally exports to `.xlsx` and `.docx` files.
