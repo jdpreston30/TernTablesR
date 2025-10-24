@@ -3,6 +3,7 @@
 #' @param data Tibble with variables.
 #' @param vars Character vector of variables to summarize. Defaults to all.
 #' @param exclude_vars Character vector to exclude.
+#' @param force_ordinal Character vector of variables to treat as ordinal (i.e., use medians/IQR) even when consider_normality = TRUE.
 #' @param output_xlsx Optional Excel filename.
 #' @param output_docx Optional Word filename.
 #' @param consider_normality Logical; if TRUE choose mean +- SD vs median [IQR].
@@ -14,7 +15,7 @@
 #' @examples
 #' # ternD(mtcars, consider_normality = TRUE, print_normality = TRUE)
 #' @export
-ternD <- function(data, vars = NULL, exclude_vars = NULL,
+ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
                   output_xlsx = NULL, output_docx = NULL,
                   consider_normality = FALSE, print_normality = FALSE, 
                   round_intg = FALSE, smart_rename = FALSE, insert_subheads = TRUE) {
@@ -204,11 +205,17 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL,
     sw <- if (print_normality || consider_normality) shapiro_p(x) else NA_real_
 
     if (isTRUE(consider_normality)) {
-      # choose mean +- SD if normal; else median [IQR]
-      if (!is.na(sw) && sw >= 0.05) {
-        summary_str <- fmt_mean_sd(x)
-      } else {
+      # Check if variable is forced to be ordinal
+      if (!is.null(force_ordinal) && var %in% force_ordinal) {
+        # Force ordinal: use median/IQR regardless of normality
         summary_str <- fmt_median_iqr(x)
+      } else {
+        # choose mean +- SD if normal; else median [IQR]
+        if (!is.na(sw) && sw >= 0.05) {
+          summary_str <- fmt_mean_sd(x)
+        } else {
+          summary_str <- fmt_median_iqr(x)
+        }
       }
       out <- tibble::tibble(
         Variable = paste0("  ", var),
