@@ -22,6 +22,7 @@
 #' @param round_intg Logical; if \code{TRUE}, rounds all means, medians, IQRs, and standard deviations to nearest integer (0.5 rounds up). Default is \code{FALSE}.
 #' @param smart_rename Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.
+#' @param factor_order Character; controls the ordering of factor levels in the output. If \code{"frequency"} (default), orders levels by decreasing frequency (most common first). If \code{"levels"}, respects the original factor level ordering as defined in the data.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 #' p-values, test type, and optionally odds ratios and total summary column.
@@ -44,7 +45,8 @@ ternG <- function(data,
                   p_digits = 3,
                   round_intg = FALSE,
                   smart_rename = FALSE,
-                  insert_subheads = TRUE) {
+                  insert_subheads = TRUE,
+                  factor_order = "frequency") {
 
   # Helper function for proper rounding (0.5 always rounds up)
   round_up_half <- function(x, digits = 0) {
@@ -157,7 +159,14 @@ ternG <- function(data,
         } else if (is_yes_no_full) {
           ref_level <- "Yes"
         } else {
-          ref_level <- names(sort(colSums(tab), decreasing = TRUE))[1]
+          if (factor_order == "levels" && is.factor(g[[var]])) {
+            # Use the first level that actually appears in the data
+            available_levels <- levels(g[[var]])[levels(g[[var]]) %in% colnames(tab)]
+            ref_level <- available_levels[1]
+          } else {
+            # Default: use most frequent level
+            ref_level <- names(sort(colSums(tab), decreasing = TRUE))[1]
+          }
         }
         result <- tibble(Variable = paste0("  ", var, ": ", ref_level))
         for (g_lvl in group_levels) {
@@ -207,7 +216,15 @@ ternG <- function(data,
       } else {
         # Hierarchical format: header + indented sub-categories
         # tab_total_n is already a vector of total counts per level
-        sorted_levels <- names(sort(tab_total_n, decreasing = TRUE))
+        if (factor_order == "levels" && is.factor(g[[var]])) {
+          # Respect original factor level ordering
+          sorted_levels <- levels(g[[var]])
+          # Filter to only include levels that actually appear in the data
+          sorted_levels <- sorted_levels[sorted_levels %in% names(tab_total_n)]
+        } else {
+          # Default: sort by frequency (descending order)
+          sorted_levels <- names(sort(tab_total_n, decreasing = TRUE))
+        }
         
         # Create header row for the main variable (no data, just variable name)
         header_row <- tibble(Variable = paste0("  ", .clean_variable_name_for_header(var)))

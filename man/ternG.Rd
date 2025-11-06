@@ -22,7 +22,8 @@ ternG(
   p_digits = 3,
   round_intg = FALSE,
   smart_rename = FALSE,
-  insert_subheads = TRUE
+  insert_subheads = TRUE,
+  factor_order = "frequency"
 )
 }
 \arguments{
@@ -61,6 +62,8 @@ ternG(
 \item{smart_rename}{Logical; if \code{TRUE}, automatically cleans variable names and subheadings for publication-ready output using hybrid AI+rules cleaning. Uses rule-based cleaning for known medical terms, falls back to AI for complex cases. Default is \code{FALSE}.}
 
 \item{insert_subheads}{Logical; if \code{TRUE}, creates hierarchical structure with headers and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, uses simple flat format. Default is \code{TRUE}.}
+
+\item{factor_order}{Character; controls the ordering of factor levels in the output. If \code{"frequency"} (default), orders levels by decreasing frequency (most common first). If \code{"levels"}, respects the original factor level ordering as defined in the data.}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,

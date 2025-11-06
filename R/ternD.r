@@ -26,6 +26,9 @@
 #' @param insert_subheads Logical; if \code{TRUE}, creates hierarchical structure with headers 
 #'   and indented sub-categories for multi-level categorical variables (except Y/N). If \code{FALSE}, 
 #'   uses simple flat format. Default is \code{TRUE}.
+#' @param factor_order Character; controls the ordering of factor levels in the output. If 
+#'   \code{"frequency"} (default), orders levels by decreasing frequency (most common first). 
+#'   If \code{"levels"}, respects the original factor level ordering as defined in the data.
 #'
 #' @details
 #' The function always returns a tibble with a single "Summary" column format, regardless of the
@@ -65,7 +68,8 @@
 ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
                   output_xlsx = NULL, output_docx = NULL,
                   consider_normality = FALSE, print_normality = FALSE, 
-                  round_intg = FALSE, smart_rename = FALSE, insert_subheads = TRUE) {
+                  round_intg = FALSE, smart_rename = FALSE, insert_subheads = TRUE,
+                  factor_order = "frequency") {
   stopifnot(is.data.frame(data))
 
   # Helper function for proper rounding (0.5 always rounds up)
@@ -146,8 +150,16 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
       }
       pct <- round(100 * prop.table(tab))
       
-      # Sort levels by frequency (descending order - most common first)
-      sorted_levels <- names(sort(tab, decreasing = TRUE))
+      # Sort levels by frequency (descending order - most common first) or respect factor levels
+      if (factor_order == "levels" && is.factor(v)) {
+        # Respect original factor level ordering
+        sorted_levels <- levels(v)
+        # Filter to only include levels that actually appear in the data
+        sorted_levels <- sorted_levels[sorted_levels %in% names(tab)]
+      } else {
+        # Default: sort by frequency (descending order)
+        sorted_levels <- names(sort(tab, decreasing = TRUE))
+      }
       
       # Determine if this should use simple format or hierarchical subheads
       # Always use simple format for Y/N variables or when insert_subheads is FALSE
@@ -189,8 +201,15 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
           # Yes/No variables: show only Yes
           ref_level <- "Yes"
         } else {
-          # Other variables: show most common level
-          ref_level <- sorted_levels[1]  # Already sorted by frequency
+          # Other variables: show most common level or first level based on factor_order
+          if (factor_order == "levels" && is.factor(v)) {
+            # Use the first level that actually appears in the data
+            available_levels <- levels(v)[levels(v) %in% names(tab)]
+            ref_level <- available_levels[1]
+          } else {
+            # Default: show most common level
+            ref_level <- sorted_levels[1]  # Already sorted by frequency
+          }
         }
         
         row <- tibble::tibble(
