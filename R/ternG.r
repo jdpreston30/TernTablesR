@@ -190,24 +190,24 @@ ternG <- function(data,
               fisher_obj <- tryCatch(stats::fisher.test(tab), error = function(e) NULL)
               if (!is.null(fisher_obj)) {
                 result$OR <- sprintf("%.2f [%.2f–%.2f]", fisher_obj$estimate, fisher_obj$conf.int[1], fisher_obj$conf.int[2])
-                result$OR_method <- "Fisher"
+                if (show_test) result$OR_method <- "Fisher"
               } else {
                 result$OR <- "NA (calculation failed)"
-                result$OR_method <- "Fisher"
+                if (show_test) result$OR_method <- "Fisher"
               }
             } else {
               or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
               result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
-              result$OR_method <- "Wald"
+              if (show_test) result$OR_method <- "Wald"
             }
           } else if (OR_method == "wald") {
             or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
             result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f–%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
-            result$OR_method <- "Wald"
+            if (show_test) result$OR_method <- "Wald"
           }
         } else if (OR_col) {
           result$OR <- NA_character_
-          result$OR_method <- NA_character_
+          if (show_test) result$OR_method <- NA_character_
         }
 
         if (descriptive) {
@@ -237,7 +237,7 @@ ternG <- function(data,
         }
         if (OR_col) {
           header_row$OR <- ""
-          header_row$OR_method <- ""
+          if (show_test) header_row$OR_method <- ""
         }
         if (descriptive) {
           header_row$Total <- ""
@@ -274,7 +274,7 @@ ternG <- function(data,
           
           if (OR_col) {
             out$OR <- "-"
-            out$OR_method <- "-"
+            if (show_test) out$OR_method <- "-"
           }
           if (descriptive) {
             out$Total <- paste0(tab_total_n[level], " (", tab_total_pct[level], "%)")
@@ -492,10 +492,13 @@ ternG <- function(data,
   if (show_test) {
     desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "test", "OR_method", normality_cols)
   } else {
-    desired <- c("Variable", existing_group_cols, "Total", "p", "OR", "OR_method", normality_cols)
-    # Remove test column if it exists
+    desired <- c("Variable", existing_group_cols, "Total", "p", "OR", normality_cols)
+    # Remove test and OR_method columns if they exist
     if ("test" %in% names(out_tbl)) {
       out_tbl <- dplyr::select(out_tbl, -test)
+    }
+    if ("OR_method" %in% names(out_tbl)) {
+      out_tbl <- dplyr::select(out_tbl, -OR_method)
     }
   }
 
