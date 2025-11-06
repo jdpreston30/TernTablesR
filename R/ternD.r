@@ -213,7 +213,7 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
         }
         
         row <- tibble::tibble(
-          Variable = paste0("  ", var, ": ", ref_level),
+          Variable = paste0("  ", var),
           Summary = paste0(as.integer(tab[[ref_level]]), " (", pct[[ref_level]], "%)")
         )
         if (print_normality) row$SW_p <- NA_real_

@@ -168,7 +168,7 @@ ternG <- function(data,
             ref_level <- names(sort(colSums(tab), decreasing = TRUE))[1]
           }
         }
-        result <- tibble(Variable = paste0("  ", var, ": ", ref_level))
+        result <- tibble(Variable = paste0("  ", var))
         for (g_lvl in group_levels) {
           result[[group_labels[g_lvl]]] <- paste0(
             tab_n[g_lvl, ref_level], " (", tab_pct[g_lvl, ref_level], "%)"
