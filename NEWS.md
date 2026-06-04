@@ -1,373 +1,200 @@
-# TernTables 1.7.1.9010 (development)
+# TernTables 1.7.2
 
-## New features
+## New exported functions
 
-* **`mode`, `extra_na`, and `drop_cols` parameters added to `ternP()`**:
-  `ternP()` now supports two preprocessing modes and additional user control
-  over NA detection and column removal.
+* **`ternStyle()`**: Applies full TernTables 'Word' formatting to any
+  user-supplied tibble — font, header shading, borders, caption, footnote,
+  and citation footer — without running it through the `ternG()`/`ternD()`
+  pipeline. Supports `subheader_rows`, `bold_rows`, `italic_rows`,
+  `bold_cols`, `italic_cols`, `bold_sig` (cell-level p-value bolding for
+  non-standard column names), and `header_format_follow`. Returns a tibble
+  with a `ternB_meta` attribute for direct use in `ternB()`.
 
-  - `mode = "auto"` (default): existing behaviour — PHI detection runs as a
-    hard stop, all cleaning transformations apply automatically.
-  - `mode = "manual"`: PHI check is skipped (a prominent warning is emitted).
-    Intended for users whose data triggers false-positive PHI flags (e.g.
-    columns named `"Address"` that contain a non-PHI clinical address field).
-    All other cleaning steps (string-NA conversion, whitespace trimming,
-    empty-column removal, blank-row removal, case normalisation) still run.
-  - `extra_na`: character vector of additional strings to treat as `NA`,
-    appended to the built-in list. Works in both modes. Example:
-    `extra_na = c("9999", "Not Done", "PENDING")`.
-  - `drop_cols`: character vector of column names to drop before cleaning
-    begins. Intended for explicit identifier removal in `"manual"` mode.
-    Column names not found in the data are silently ignored. Works in both
-    modes.
+* **`classify_normality()`**: Exposes the internal ROBUST normality routing
+  algorithm as an exported function. Returns a tidy tibble with per-variable
+  × per-group statistics (n, skewness, excess kurtosis, Shapiro-Wilk p), the
+  gate that triggered the routing decision, a plain-language `gate_reason`,
+  and the final parametric/non-parametric routing outcome. Intended for
+  manuscript auditing and responding to reviewer questions about normality
+  assessment.
 
-# TernTables 1.7.1.9008 (development)
+## New parameters
 
-## New features
+**`ternG()`**
 
-* **`bold_sig` parameter** (`ternStyle`, `word_export`): Adds cell-level
-  significance-based bolding for custom tibbles where p-value columns are not
-  named `"P value"` (the internal name used by `ternG`). Supply a named list
-  with `p_cols` (character vector of column names containing p-value strings),
-  `hr_cols` (optional paired effect-size column names to also bold, same
-  length and order as `p_cols`), and `threshold` (default `0.05`). For each
-  significant p-value cell, that cell is bolded; if `hr_cols` is supplied, the
-  corresponding HR/coefficient cell in the same row is also bolded. The
-  Variable column is never touched by `bold_sig` — use `bold_rows` to bold
-  entire predictor-header rows (e.g., where p represents an omnibus LRT).
-  Handles `< 0.001`-style strings and scientific notation. Carried through
-  `ternB_meta` so `ternB()` correctly replays the formatting in combined
-  documents.
+* `force_normal` — Bypass all normality assessment for listed variables;
+  always route to mean ± SD and Welch tests. Per-variable counterpart to
+  `force_ordinal`. `force_ordinal` takes priority when a variable appears in
+  both.
+* `force_continuous` — Bypass automatic binary 0/1 detection for listed
+  variables so they are analysed as continuous rather than converted to Y/N
+  categorical.
+* `show_p` — When `FALSE`, suppresses the P value column and all associated
+  columns (OR, test, normality), producing a descriptive-only grouped table.
+* `percentage_compute` — `"column"` (default) or `"row"`. Controls the
+  denominator for categorical percentages. When `"row"`, the Total column is
+  automatically suppressed.
+* `categorical_posthoc` — For three-or-more-group comparisons, computes
+  Haberman's adjusted standardized residuals following a significant omnibus
+  test (p < 0.05). Cells exceeding ±1.96 are annotated with `*`. The
+  ±1.96 threshold derives from the omnibus chi-squared distribution; no
+  additional multiple-comparisons correction is required.
+* `p_adjust` — When `TRUE`, applies Benjamini-Hochberg (BH) false discovery
+  rate correction to all omnibus P values.
+* `p_adjust_display` — `"fdr_only"` (default) replaces the P column with
+  BH-corrected values; `"both"` retains raw values alongside the corrected
+  column.
+* `show_missing` — When `TRUE`, appends a `Missing: n (%)` sub-row beneath
+  each variable showing per-group missing counts. Footnote added
+  automatically.
+* `show_missingness` — `FALSE` (default), `"total"`, or `"group"`. Appends
+  dedicated missingness percentage column(s): one overall column (`"total"`)
+  or one interleaved column per group (`"group"`). Counts both `NA` and
+  string representations of missing data.
+* `missing_indicators` — Custom character vector that replaces the built-in
+  string-NA list when computing missingness columns (requires
+  `show_missingness` to be active). Matching is case-insensitive.
+* `zero_to_dash` — When `TRUE`, replaces `"0 (0%)"` cells with `"-"` in
+  categorical output.
+* `round_decimal` — Integer; overrides the default 1 decimal place for all
+  continuous summary values. Ignored when `round_intg = TRUE`.
+* `font_family` — Font used throughout all 'Word' output. Defaults to
+  `getOption("TernTables.font_family", "Arial")`; set package-wide with
+  `options(TernTables.font_family = "Times New Roman")`.
+* `citation` — When `TRUE` (default), embeds a full package citation as a
+  page footer in every exported `.docx` and at the end of the methods
+  document.
+* `open_doc` — When `TRUE` (default), opens the written `.docx` in the
+  system default application after saving. Set `FALSE` to suppress (useful
+  in scripted or server-side workflows).
+* `plain_header` — Named character vector (same interface as
+  `category_start`). Inserts a label-only row with underline formatting and
+  no bold, merge, or border treatments. Also accepted by `word_export()`.
+* `abbreviation_footnote`, `variable_footnote`, `index_style` — Structured
+  footnote system. `abbreviation_footnote` prints first. `variable_footnote`
+  (named character vector) auto-assigns `*`, `†`, `‡` … as superscripts to
+  named variables in column 1 and appends definitions below the table.
+  `index_style = "alphabet"` uses Unicode superscript letters instead. Pipe-
+  separated keys (`"Var A|Var B"`) assign one shared symbol and footnote to
+  multiple variables.
+
+**`ternD()`**: `force_normal`, `force_continuous`, `plain_header`,
+`show_missing`,
+`show_missingness`, `missing_indicators`, `zero_to_dash`, `round_decimal`,
+`font_family`, `citation`, `open_doc` — all behave identically to the
+`ternG()` descriptions above. `show_missingness = "group"` raises an
+informative error directing the user to `ternG()`.
+
+**`ternP()`**
+
+* `mode` — `"auto"` (default) or `"manual"`. In `"manual"` mode, the PHI
+  column-name hard-stop is skipped and a prominent warning is emitted; all
+  other cleaning steps still run. Intended for datasets that trigger
+  false-positive PHI flags (e.g. a column named `"Address"` that contains a
+  non-PHI clinical field). Use `drop_cols` to explicitly remove identifier
+  columns in this mode.
+* `extra_na` — Character vector of additional strings to treat as `NA`,
+  appended to the built-in list. Example:
+  `extra_na = c("9999", "Not Done", "PENDING")`.
+* `drop_cols` — Character vector of column names to drop before cleaning
+  begins. Names not found in the data are silently ignored.
+
+The preprocessing summary now includes a **Missingness Summary** section
+listing every column with at least one missing value (count and percentage),
+computed on the fully cleaned data. The section is suppressed when no
+missing values exist.
+
+**`word_export()`, `ternB()`, `ternStyle()`**: `font_family`, `round_decimal`,
+`citation` (as described for `ternG()`). `word_export()` and `ternStyle()`
+additionally accept `bold_sig` (named list for cell-level p-value bolding
+of custom tibbles with non-standard p-value column names).
+
+**`write_cleaning_doc()`**: `open_doc` and `citation` added for consistency
+with all other Word-output functions.
+
+**`write_methods_doc()`** redesigned: generates a single dynamic paragraph
+tailored to the actual run (descriptive, two-group, or three-or-more-group)
+rather than a fixed three-section boilerplate. `boilerplate = TRUE` writes a
+comprehensive reference document covering all five standard configurations.
+`ternB(methods_doc = TRUE)` generates one labeled methods section per table,
+deduplicating tables with identical configurations.
 
 ## Bug fixes
 
-* **Degenerate single-level categorical variable crashes entire `ternG()` call** (`ternG`):
-  When a variable is cleaned by converting sparse values (e.g. `"Unknown"`) to `NA`,
-  it can be left with only one non-`NA` level. The `fisher_flag` detection line called
-  `chisq.test()` outside any `tryCatch`, which throws an uncaught error on a single-column
-  contingency table and terminates the entire run. Fixed by wrapping that call in
-  `tryCatch(..., error = function(e) TRUE)` — degenerate variables now default to Fisher
-  and fall through to the existing `"insufficient variation"` display path, showing counts
-  with `NA (insufficient variation)` for the p-value instead of crashing.
-* **`fisher.test()` segfaults on large multi-level contingency tables** (`ternG`):
-  For categorical variables with many levels (e.g. diagnosis codes with 50+ categories),
-  `fisher.test()` triggers a C-level segfault — not an R error — which cannot be caught
-  by `tryCatch` and kills the entire R session. The existing Monte Carlo simulation
-  fallback only fired on R-level errors, so it never helped here. Fixed by detecting
-  tables larger than 2×2 (`nrow(tab) > 2 || ncol(tab) > 2`) before calling `fisher.test`
-  and routing them directly to `fisher.test(..., simulate.p.value = TRUE)`. Exact Fisher
-  is still used for 2×2 tables (which are always safe) with the simulation fallback
-  retained for those edge cases.
-* **`methods_filename = NULL` crashes with `dirname` error** (`ternG`, `ternD`, `write_methods_doc`):
-  Passing `methods_filename = NULL` explicitly caused `dirname(NULL)` to throw
-  `"a character vector argument expected"` inside `write_methods_doc()`. Fixed by
-  resolving `NULL` (or empty string) to `"TernTables_methods.docx"` at the top of
-  `write_methods_doc()` before any branching, matching the documented default.
-
-* **`categorical_posthoc` crash when `stdres` is not a matrix** (`ternG`):
-  On degenerate contingency tables, `chisq.test()$stdres` could return a named
-  vector instead of a matrix. `nrow()` on a vector returns `NULL`, making
-  `NULL >= 2L` evaluate to `logical(0)`, causing the `if()` condition to error
-  with `"missing value where TRUE/FALSE needed"`. Fixed by adding `is.matrix(stdres)`
-  to the guard condition.
-  (`word_export`): `word_export()` renames column headers internally — the
-  `"P"` column becomes `"P value"`, and when `line_break_header = TRUE`
-  (the `word_export` default) spaces in all other column names are replaced
-  with `\n` (e.g. `"HR (95% CI)"` → `"HR\n(95%\nCI)"`). The `bold_sig`
-  block was comparing caller-supplied names against the already-renamed
-  `colnames(modified_tbl)`, so callers passing `"HR (95% CI)"` would never
-  match and HR bolding was silently skipped. Fixed by building an
-  `original → renamed` name map before the loop and resolving each caller-
-  supplied name through the map before the lookup, ensuring `bold_sig` works
-  correctly regardless of `line_break_header` setting or internal renames.
-
----
-
-# TernTables 1.7.1.9005 (development)
-
-## Bug fixes
-
-* **`categorical_posthoc` subscript out-of-bounds with `NA` level names**
-  (`ternG`): When a categorical variable had an `NA` factor level (e.g. from
-  `haven_labelled` data), `NA %in% vector` silently returned `FALSE` so the
-  guard did not skip the row, and the subsequent `stdres[g_lvl, NA]` matrix
-  subscript threw `subscript out of bounds`. Fixed by adding explicit
-  `is.na()` guards before the `%in%` checks and wrapping the matrix subscript
-  in `tryCatch()` in both the hierarchical and simple post-hoc paths.
-
-* **`cat_posthoc_fisher_display` referenced before extraction** (`ternG`):
-  The `write_methods_doc()` call used `cat_posthoc_fisher_display` before it
-  was extracted from `.ternG_env`, causing `object not found` errors when
-  `categorical_posthoc = TRUE`. Fixed by moving the entire `.ternG_env`
-  extraction block above the `write_methods_doc()` invocation.
-
-* **Blank-string factor levels produced `NA (NA%)` in output** (`ternG`):
-  Variables encoded with `""` (empty string) as a factor level — common in
-  UNOS/SRTR `haven_labelled` datasets — produced `NA (NA%)` for that level's
-  cell counts. Root cause: `as.data.frame.matrix()` internally passes column
-  names through `make.names()`, which renames `""` to `"X"` regardless of the
-  `check.names` argument (which is silently ignored by that function). All
-  downstream character-based lookups for the original `""` level then failed.
-  Fixed by saving `colnames(tab)` before conversion and explicitly restoring
-  them on `tab_n` and `tab_pct` afterward, and by switching all 2D cell
-  lookups to integer indexing via `match()` so any level name — blank, with
-  spaces, commas, parentheses, or leading digits — is handled safely.
-
----
-
-# TernTables 1.7.1.9004 (development)
-
-## New features
-
-* **Fisher's exact + `categorical_posthoc` warning** (`ternG`): When the omnibus
-  test for a categorical variable was Fisher's exact but `categorical_posthoc = TRUE`,
-  a terminal warning is now emitted after the run noting that Haberman's adjusted
-  standardized residuals were derived from the chi-squared contingency table (no
-  Fisher's exact equivalent exists) and may be less reliable when expected cell
-  counts are very small. The same caveat sentence is also appended to the
-  statistical methods document for the affected variables.
-
-* **`show_missingness` and `missing_indicators` in `write_methods_doc()`**: The
-  methods document now dynamically includes a sentence describing missingness
-  reporting when `show_missingness` is non-`FALSE`. The sentence states the
-  mode used (`"total"` vs `"group"`), lists the string representations of
-  missing values that were counted, and is added to all three section types
-  (descriptive, two-group, three-or-more-group). `ternG()` and `ternD()` both
-  pass these arguments automatically when calling `write_methods_doc()`.
-
----
-
-# TernTables 1.7.1.9003 (development)
-
-## New features
-
-* **`show_missingness` parameter** (`ternG`, `ternD`): Adds missing-value
-  percentage column(s) to the output table. Set to `"total"` to append one
-  `"Missing, n (%)"` column at the far right showing the count and percentage
-  of missing observations (true `NA` + string NAs) across all rows for each
-  variable. Set to `"group"` (ternG only) to interleave one `"Miss. [level]"`
-  column after each group's data column. Defaults to `FALSE` (no column added).
-  Using `"group"` in `ternD()` raises an informative error directing the user
-  to `ternG()`. A terminal message is printed after the run listing the mode
-  used and which string values were counted as missing.
-
-* **`missing_indicators` parameter** (`ternG`, `ternD`): Optional character
-  vector that overrides the default ternP string-NA list when computing
-  missingness columns (requires `show_missingness` to be active). When supplied,
-  the custom list **replaces** (not supplements) the built-in defaults; true
-  `NA` always counts regardless. Matching is case-insensitive and
-  whitespace-trimmed.
+* **`fisher.test()` segfault** (`ternG`): Tables larger than 2×2 now route
+  directly to Monte Carlo simulation (`simulate.p.value = TRUE`,
+  B = 10,000). Previously the C-level exact algorithm could segfault on
+  tables with many levels, killing the R session — a condition that
+  `tryCatch` cannot intercept.
+* **Degenerate single-level categorical crash** (`ternG`): Variables reduced
+  to one non-`NA` level after string-NA removal now display
+  `NA (insufficient variation)` for the p-value instead of crashing the
+  entire `ternG()` call.
+* **`methods_filename = NULL` crash** (`ternG`, `ternD`,
+  `write_methods_doc`): Passing `NULL` explicitly now resolves to the
+  default `"TernTables_methods.docx"` rather than throwing a
+  `dirname(NULL)` error.
+* **`categorical_posthoc` crashes** (`ternG`): Fixed three independent
+  issues — (1) `stdres` returning a vector instead of a matrix caused an
+  `if()` condition to error; (2) `NA` factor level names bypassed `%in%`
+  guards causing subscript-out-of-bounds; (3) `cat_posthoc_fisher_display`
+  was referenced before being extracted from `.ternG_env`.
+* **Blank-string factor levels** (`ternG`): Factor levels named `""`
+  (common in UNOS/SRTR `haven_labelled` data) produced `NA (NA%)` because
+  `as.data.frame.matrix()` silently renames `""` to `"X"` via
+  `make.names()`. Fixed by saving column names before conversion and
+  restoring them explicitly; all 2D cell lookups now use integer indexing
+  via `match()`.
+* **Blank page between `ternB()` tables**: Stripped the default blank
+  paragraph from each temp document, eliminating spurious blank pages in
+  combined output.
+* **Citation footer bleed in `ternB()`**: Page footer from one table's temp
+  document no longer carries over into subsequent tables in the combined
+  file.
+* **CLD dependency resolution**: `rstatix` and `multcompView` moved to
+  `Imports` (were `Suggests`), ensuring compact letter display superscripts
+  always work without a separate install step.
+* **Wide-table page overflow** (`word_export`): `fit_to_width(6.5)` is now
+  applied after `autofit()` only when the table exceeds Letter page width
+  (6.5 in), preventing column truncation in 'Word' and PDF exports.
+* **Name-cleaning false positives**: Fixed `.apply_cleaning_rules()` patterns
+  that incorrectly transformed variable names containing medical
+  abbreviations and unit suffixes (e.g. `"Gy"` in radiation dose variables).
+* **`bold_sig` column-name mismatch** (`word_export`, `ternStyle`):
+  `word_export()` renames columns internally (e.g. `"P"` → `"P value"`,
+  spaces → `\n` when `line_break_header = TRUE`). The `bold_sig` lookup was
+  comparing caller-supplied names against already-renamed columns, so HR
+  bolding was silently skipped. Fixed by building an original-to-renamed name
+  map before the lookup.
 
 ## Internal changes
 
-* Extracted the canonical string-NA list and per-element missing-value test
-  into two shared helpers — `.tern_missing_strings()` and
-  `.is_missing_value()` — appended to `utils_preprocess.R`. `ternP()` now
-  sources the same list via `.tern_missing_strings()` instead of an inline
-  `c(...)`, ensuring a single source of truth for what counts as missing across
-  all functions.
+* **CRAN compliance — `<<-` eliminated**: All accumulator patterns using
+  `<<-` inside nested closures in `ternG.R`, `ternD.R`, and `ternP.R`
+  replaced with `new.env(parent = emptyenv())`-based counters. No
+  user-visible change.
+* **`set.seed()` replaced with `withr::with_seed()`**: RNG state is now
+  scoped locally within the Monte Carlo Fisher's exact fallback, restoring
+  the caller's state after the call. `withr` added to `Imports`.
+* **ROBUST Gate 2 — kurtosis added**: Excess kurtosis (|excess kurtosis| > 7)
+  now triggers non-parametric routing alongside absolute skewness > 2.
+  Normality decision logic extracted to `utils_normality.R`.
+* **CLD letter ordering**: Removed center-based letter re-mapping;
+  `multcompLetters()` default alphabetical ordering is now used directly,
+  aligning with standard CLD conventions.
+* **PHI detection tightened**: `patient_id`, `subject_id`,
+  `participant_id`, and clinical-event date patterns removed from the flag
+  list; only personal-identity patterns (DOB, DOD) remain.
+* **Shared missing-value helpers**: `.tern_missing_strings()` and
+  `.is_missing_value()` extracted to `utils_preprocess.R` as a single
+  source of truth used by both `ternP()` and the `show_missingness` columns
+  in `ternG()`/`ternD()`.
+* **Independence-of-observations scope**: Explicit notes added to the
+  package help page, `ternG()` description, vignette, and README stating
+  that all tests assume independent observations.
 
 ---
 
-# TernTables 1.7.1.9002 (development)
-
-## New features
-
-* **`categorical_posthoc` parameter** (`ternG`): Opt-in post-hoc analysis for
-  categorical variables in three-or-more-group comparisons. When
-  `categorical_posthoc = TRUE`, adjusted standardized residuals (Haberman's
-  residuals) are computed from the global contingency table following a
-  significant omnibus test (p < 0.05). Cells whose residual exceeds ±1.96 are
-  annotated with an asterisk (*), indicating a significant deviation from
-  expected frequencies at α = 0.05. No additional multiple-comparisons
-  correction is required — the ±1.96 threshold is derived directly from the
-  omnibus chi-squared distribution. Defaults to `FALSE` (off). The auto-
-  generated methods document and table footnote are updated automatically when
-  residuals are applied.
-
-* **Per-column missingness report** (`ternP`): The preprocessing summary now
-  includes a `Missingness Summary` section listing every column with at least
-  one missing value, showing the count and percentage of missing cells. The
-  section is suppressed entirely when no missing values exist, keeping the
-  output clean for already-complete datasets. The missingness report reflects
-  the final state of `clean_data` after all transformations are applied.
-
----
-
-# TernTables 1.7.1
-
-## Bug fixes
-
-* **`percentage_compute = "row"` Total column auto-suppressed** (`ternG`):
-  When `percentage_compute = "row"`, the Total column is now automatically
-  suppressed. Previously the Total column was shown but displayed `n (100%)`
-  for every category level, which is correct but uninformative. The
-  `show_total` argument is now overridden to `FALSE` when row percentages are
-  requested. Roxygen documentation updated accordingly.
-
----
-
-# TernTables 1.7.0
-
-## New features
-
-* **`ternStyle()`**: New exported function that applies full TernTables Word
-  formatting to any user-supplied tibble, enabling custom or manually assembled
-  tables to be exported with the same font, shading, border, and footnote
-  styling as `ternG()` / `ternD()` output. The returned tibble carries a
-  `ternB_meta` attribute so it can be passed directly to `ternB()` for
-  inclusion in combined multi-table documents.
-
-* **`classify_normality()`**: New exported function that runs the same
-  normality assessment used internally by `ternG()` and `ternD()`, returning a
-  tidy tibble with per-variable × per-group statistics (n, skewness, excess
-  kurtosis, Shapiro-Wilk p), the decision gate, a plain-language `gate_reason`,
-  and the final routing outcome. Designed for manuscript auditing and responding
-  to reviewer questions about normality testing.
-
-* **`font_family` parameter** (`ternG`, `ternD`, `ternB`, `ternStyle`,
-  `word_export`, `write_methods_doc`, `write_cleaning_doc`): New argument
-  controlling the font used throughout all Word output. Defaults to
-  `getOption("TernTables.font_family", "Arial")`. Package-wide default can be
-  set once with `options(TernTables.font_family = "Times New Roman")`.
-
-* **`plain_header` parameter** (`ternG`, `ternD`, `word_export`): When `TRUE`,
-  the first column header cell is rendered without the standard dark background
-  and white text, producing a plain/white header consistent with some journal
-  styles.
-
-* **`show_p` parameter** (`ternG`): Suppresses the P value column and all
-  associated columns (OR, test, normality) when `FALSE`. Produces a
-  descriptive-only grouped table; useful for baseline characteristic tables
-  where hypothesis testing is not the intent.
-
-* **`show_missing` parameter** (`ternG`, `ternD`): When `TRUE`, appends a
-  `Missing: n (%)` sub-row beneath each variable showing per-group missing
-  counts. A footnote explaining the format is added automatically.
-
-* **`force_continuous` parameter** (`ternG`, `ternD`): Character vector of
-  variable names that should bypass automatic binary-numeric detection and
-  always be analysed as continuous (mean ± SD / median [IQR]). Useful when a
-  `{0, 1}` column represents a measurement or dose rather than a category.
-  `force_ordinal` takes priority if a variable appears in both.
-
-* **`force_normal` parameter** (`ternG`, `ternD`): Character vector of
-  variables that bypass all normality assessment and are always summarised as
-  mean ± SD and compared with Welch's *t*-test / Welch ANOVA. The
-  per-variable parametric counterpart to `force_ordinal`.
-
-* **`zero_to_dash` parameter** (`ternG`, `ternD`): When `TRUE`, replaces
-  `"0 (0%)"` cells in categorical output with `"-"`. Also replaces
-  structurally impossible `"0 (NaN%)"` cells (present in any setting).
-
-* **`percentage_compute` parameter** (`ternG`): Controls the denominator for
-  categorical percentages. `"column"` (default) uses within-group column
-  totals; `"row"` uses the row total, showing how each category level is
-  distributed across groups. When `"row"`, the Total column shows 100% for
-  every level.
-
-* **`round_decimal` parameter** (`ternG`, `ternD`, `ternStyle`, `word_export`,
-  `ternB`): Integer number of decimal places for all continuous summary values.
-  Overrides the default of 1 decimal place. Ignored when `round_intg = TRUE`.
-  Default is `NULL` (preserves existing behavior).
-
-* **`p_adjust` and `p_adjust_display` parameters** (`ternG`): `p_adjust = TRUE`
-  applies Benjamini-Hochberg FDR correction to all omnibus P values.
-  `p_adjust_display = "fdr_only"` (default) renames the P column to
-  `"P value (FDR corrected)"`; `"both"` retains raw values alongside the
-  corrected column.
-
-* **`citation` parameter** (`ternG`, `ternD`, `ternB`, `word_export`,
-  `write_methods_doc`): When `TRUE` (default), embeds a full citation as a Word
-  page footer in every exported `.docx`. Set `FALSE` to suppress.
-
-* **`open_doc` parameter** (`ternG`, `ternD`, `word_export`,
-  `write_methods_doc`): When `TRUE` (default), opens the written `.docx` in the
-  system default application after saving. Set `FALSE` to suppress (default for
-  web-app use).
-
-* **`variable_footnote`, `abbreviation_footnote`, `index_style` parameters**
-  (`ternG`, `ternD`, `word_export`, `ternB`): Structured footnote system.
-  `abbreviation_footnote` prints first. `variable_footnote` (named character
-  vector) auto-assigns `*`, `†`, `‡` … as Word superscripts to named variables
-  in column 1 and appends definitions below the table. `index_style =
-  "alphabet"` uses Unicode superscript letters instead. Pipe-separated keys
-  (`"Var A|Var B"`) assign one shared symbol and footnote to multiple variables.
-
-* **`write_methods_doc()` redesign**: Replaced three-section boilerplate with a
-  single dynamic paragraph tailored to the actual run (descriptive, two-group,
-  or three-or-more-group). `write_methods_doc(boilerplate = TRUE)` writes a
-  comprehensive reference document covering all five standard configurations.
-
-* **`ternB()` per-table methods paragraphs**: `ternB(methods_doc = TRUE)` now
-  generates one labeled methods section per table, deduplicating tables with
-  identical configurations.
-
-## Bug fixes
-
-* **CLD superscript bug**: Fixed `rstatix` / `multcompView` dependency
-  resolution that caused compact letter display (CLD) to silently fail or
-  produce incorrect superscripts when those packages were in `Suggests` rather
-  than `Imports`. Both are now hard `Imports`.
-
-* **Word export line-break header crash**: Fixed error thrown when
-  `line_break_header = FALSE` and the table had a specific column count
-  combination.
-
-* **Blank page between `ternB()` tables**: The default blank paragraph created
-  by `read_docx()` in each temp file was carried into the combined document
-  after the manual page break, pushing the subsequent table to the next page.
-  Fixed by stripping the initial blank paragraph in `word_export()`.
-
-* **Citation footer bleed between `ternB()` tables**: Page footer from one
-  table's temp document was bleeding into the next in combined output. Fixed.
-
-* **`category_start` anchors**: Now match case-insensitively against display
-  variable names, so anchors written in title case no longer silently fail
-  when `smart_rename = TRUE` produces sentence-case output.
-
-* **Wide-table page overflow**: `word_export()` now applies `fit_to_width(6.5)`
-  after `autofit()` only when the table exceeds Letter page width (6.5 in),
-  preventing column truncation in Word and PDF exports.
-
-* **Name-cleaning false positives**: Fixed several `.apply_cleaning_rules()`
-  patterns that incorrectly transformed variable names containing medical
-  abbreviations and unit suffixes (e.g. `"Gy"` in dose variables).
-
-## Internal changes
-
-* **CRAN compliance — `<<-` eliminated**: All accumulator patterns using `<<-`
-  inside nested closures (`lapply` callbacks, `tryCatch` handlers) in
-  `ternG.R`, `ternD.R`, and `ternP.R` have been replaced with environment-based
-  counters (`new.env(parent = emptyenv())`) and explicit `for`-loop restructuring.
-  No change to user-visible behavior.
-
-* **`set.seed()` replaced**: The bare `set.seed()` call inside the Monte Carlo
-  Fisher's exact fallback has been replaced with `withr::with_seed()`, scoping
-  the seed locally and restoring the user's RNG state after the call.
-  `withr` added to `Imports`.
-
-* **ROBUST normality Gate 2 — kurtosis**: Excess kurtosis (|kurtosis| > 7) now
-  triggers non-parametric routing alongside skewness in Gate 2 of the four-gate
-  ROBUST algorithm. The normality decision logic has been extracted to a
-  dedicated `utils_normality.R` helper.
-
-* **CLD letter ordering**: Removed center-based letter re-mapping from
-  `.compute_cld()`. CLD letters now follow the default `multcompLetters()`
-  alphabetical ordering rather than being re-labeled so that "a" = highest
-  center. Aligns with standard CLD conventions.
-
-* **Independence-of-observations documentation**: Added explicit scope notes to
-  the package help page, `ternG()` description, vignette, and README stating
-  that all tests assume independent observations and that repeated-measures or
-  clustered data require different approaches.
-
-* **PHI detection tightening**: `utils_preprocess.R` updated to remove
-  `patient_id`, `subject_id`, `participant_id`, and clinical-event date
-  patterns from the PHI flag list. Only personal-identity date patterns (DOB,
-  DOD) remain flagged, reducing false positives on common research variable names.
-
----
 
 # TernTables 1.6.4
 

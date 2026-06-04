@@ -114,7 +114,7 @@ export_to_excel <- function(tbl, filename) {
   paste0(
     "Created with TernTables v", ver, ". Please cite: ",
     "Preston JD, Abadiotakis H, Tang A, Rust CJ, Halkos ME, Daneshmand MA, Chan JL. ",
-    "TernTables: A statistical analysis and table generation web interface for clinical and biomedical research. ",
+    "TernTables: A Statistical Analysis and Table Generation Web Interface for Clinical and Biomedical Research. ",
     "bioRxiv 2026.04.15.717241. ",
     "https://doi.org/10.64898/2026.04.15.717241"
   )

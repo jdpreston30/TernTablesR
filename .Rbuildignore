@@ -27,3 +27,4 @@
 ^statistical-review-request\.html$
 ^statistical-review-request\.md$
 ^\.Rd2pdf
+^\.claude

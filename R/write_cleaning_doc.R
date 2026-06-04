@@ -11,6 +11,10 @@
 #'   Default is \code{"cleaning_summary.docx"} in the current working directory.
 #' @param font_family Character; font family for the Word document. Default \code{"Arial"}.
 #'   Can also be set via \code{options(TernTables.font_family = ...)}.
+#' @param open_doc Logical; if \code{TRUE} (default), automatically opens the written Word
+#'   document in the system default application after saving. Set to \code{FALSE} to suppress.
+#' @param citation Logical; if \code{TRUE} (default), appends the TernTables citation as a
+#'   page footer in the written document. Set to \code{FALSE} to suppress.
 #' @return Invisibly returns the path to the written Word file.
 #' @seealso \code{\link{ternP}}, \code{\link{write_methods_doc}}
 #' @examples
@@ -19,12 +23,15 @@
 #'                       package = "TernTables")
 #' raw    <- read.csv(path, stringsAsFactors = FALSE)
 #' result <- ternP(raw)
-#' write_cleaning_doc(result, filename = file.path(tempdir(), "cleaning_summary.docx"))
+#' write_cleaning_doc(result, filename = file.path(tempdir(), "cleaning_summary.docx"),
+#'                   open_doc = FALSE)
 #' }
 #' @export
 write_cleaning_doc <- function(result,
                                filename = "cleaning_summary.docx",
-                               font_family = getOption("TernTables.font_family", "Arial")) {
+                               font_family = getOption("TernTables.font_family", "Arial"),
+                               open_doc = TRUE,
+                               citation = TRUE) {
 
   if (!inherits(result, "ternP_result")) {
     stop("`result` must be an object returned by `ternP()`.", call. = FALSE)
@@ -149,8 +156,22 @@ write_cleaning_doc <- function(result,
       "."
     )))
 
+  if (isTRUE(citation)) {
+    cit_props <- fp_text(font.family = font_family, font.size = 7,
+                         bold = TRUE, italic = TRUE, color = "black")
+    doc <- body_set_default_section(
+      doc,
+      value = prop_section(
+        footer_default = block_list(
+          fpar(ftext(.tern_citation_line(), prop = cit_props))
+        )
+      )
+    )
+  }
+
   dir.create(dirname(filename), recursive = TRUE, showWarnings = FALSE)
   print(doc, target = filename)
+  if (isTRUE(open_doc)) .open_docx(filename)
   cli::cli_alert_success("Cleaning summary written to: {filename}")
   invisible(filename)
 }

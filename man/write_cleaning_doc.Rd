@@ -7,7 +7,9 @@
 write_cleaning_doc(
   result,
   filename = "cleaning_summary.docx",
-  font_family = getOption("TernTables.font_family", "Arial")
+  font_family = getOption("TernTables.font_family", "Arial"),
+  open_doc = TRUE,
+  citation = TRUE
 )
 }
 \arguments{
@@ -18,6 +20,12 @@ Default is \code{"cleaning_summary.docx"} in the current working directory.}
 
 \item{font_family}{Character; font family for the Word document. Default \code{"Arial"}.
 Can also be set via \code{options(TernTables.font_family = ...)}.}
+
+\item{open_doc}{Logical; if \code{TRUE} (default), automatically opens the written Word
+document in the system default application after saving. Set to \code{FALSE} to suppress.}
+
+\item{citation}{Logical; if \code{TRUE} (default), appends the TernTables citation as a
+page footer in the written document. Set to \code{FALSE} to suppress.}
 }
 \value{
 Invisibly returns the path to the written Word file.
@@ -35,7 +43,8 @@ path   <- system.file("extdata/csv", "tern_colon_messy.csv",
                       package = "TernTables")
 raw    <- read.csv(path, stringsAsFactors = FALSE)
 result <- ternP(raw)
-write_cleaning_doc(result, filename = file.path(tempdir(), "cleaning_summary.docx"))
+write_cleaning_doc(result, filename = file.path(tempdir(), "cleaning_summary.docx"),
+                  open_doc = FALSE)
 }
 }
 \seealso{

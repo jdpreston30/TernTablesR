@@ -1,64 +1,54 @@
-## New submission — v1.7.0
+## Resubmission — v1.7.2
 
-This is a new feature release building on v1.6.4, which was accepted to CRAN
-on 2026-03-26. Both reviewer comments raised during the v1.6.3 review cycle
-were fully resolved in the accepted v1.6.4. This submission introduces no
-breaking changes.
+The last version accepted to CRAN was v1.6.4 (published 2026-03-26).
+A prior submission of v1.7.0 was not completed; this submission supersedes
+it. No breaking changes are introduced (see post-hoc note below).
 
----
+Changes since v1.6.4 are documented in NEWS.md. In brief:
 
-## Summary of changes since v1.6.4
-
-**New exported functions:**
-
-* `ternStyle()`: applies full TernTables Word formatting to any user-supplied
-  tibble; output carries `ternB_meta` for direct use in `ternB()`.
-* `classify_normality()`: exposes the internal normality routing algorithm as
-  a tidy audit tibble, for use in manuscript methods reporting.
-
-**New parameters** (across `ternG`, `ternD`, `ternB`, `ternStyle`,
-`word_export`, `write_methods_doc`, `write_cleaning_doc`):
-`font_family`, `plain_header`, `show_p`, `show_missing`, `force_continuous`,
-`force_normal`, `zero_to_dash`, `percentage_compute`, `round_decimal`,
-`p_adjust`, `p_adjust_display`, `citation`, `open_doc`,
-`variable_footnote`, `abbreviation_footnote`, `index_style`.
-
-**Statistical improvements:**
-* Excess kurtosis added as Gate 2 criterion in the four-gate ROBUST normality
-  algorithm; decision logic extracted to `utils_normality.R`.
-* CLD center-based letter re-mapping removed; letters now follow standard
-  `multcompLetters()` alphabetical ordering.
-
-**Bug fixes:** CLD dependency resolution, Word blank-page and citation-bleed
-bugs in `ternB()`, line-break header crash, name-cleaning false positives,
-wide-table page overflow.
+* Two new exported functions: `ternStyle()` and `classify_normality()`
+* New parameters across `ternG()`, `ternD()`, `ternP()`, `word_export()`,
+  `ternB()`: `force_normal`, `force_continuous`, `show_p`, `show_missing`,
+  `show_missingness`, `missing_indicators`, `zero_to_dash`,
+  `percentage_compute`, `categorical_posthoc`, `p_adjust`,
+  `p_adjust_display`, `round_decimal`, `font_family`, `citation`,
+  `open_doc`, `plain_header`, `abbreviation_footnote`, `variable_footnote`, `index_style`;
+  `bold_sig` in `ternStyle()` and `word_export()`; `mode`, `extra_na`,
+  `drop_cols` in `ternP()`
+* Post-hoc testing now fully supported: pairwise continuous comparisons
+  (Games-Howell / Dunn's test with compact letter display, `post_hoc = TRUE`)
+  were silently non-functional in v1.6.4 due to `rstatix` and `multcompView`
+  being in `Suggests`; both are now in `Imports`. New: `categorical_posthoc`
+  adds Haberman adjusted standardized residual analysis for categorical
+  variables in 3+ group comparisons. Note: CLD letter ordering now follows
+  standard `multcompLetters()` alphabetical convention rather than
+  center-based re-labeling; statistical conclusions are unchanged.
+* Bug fixes: C-level `fisher.test()` segfault on large contingency tables;
+  degenerate single-level categorical crash; `methods_filename = NULL`
+  crash; three `categorical_posthoc` edge-case crashes; blank-string factor
+  levels producing `NA (NA%)`; blank pages and citation bleed in `ternB()`;
+  `bold_sig` column-name mismatch after internal header renaming
+* CRAN compliance: `<<-` eliminated throughout; bare `set.seed()` replaced
+  with `withr::with_seed()`; `rstatix` and `multcompView` promoted to
+  `Imports`
 
 ---
 
 ## R CMD check results
 
-* macOS Sonoma 14.3, R 4.5.1 aarch64-apple-darwin23.6.0 (local) — 0 errors | 0 warnings | 1 note
-* Windows Server 2022, R-devel r89724 x86_64-w64-mingw32 (win-builder) — 0 errors | 0 warnings | 1 note
-
-**NOTE (local): unable to verify current time**
-Standard informational message; no action required.
-
-**NOTE (win-builder): Days since last update: 1 / possibly invalid URL**
-The "Days since last update: 1" note is expected for a same-day resubmission.
-The URL flagged (`https://tern-tables.com/`) is valid and live; win-builder
-reported an SSL connection reset (`Recv failure: Connection was reset`) which
-is a transient network issue on the win-builder side, not a broken link. The
-URL resolves correctly in all other environments.
+* macOS Sonoma 14.3, R 4.5.1 aarch64-apple-darwin23.6.0 (local) —
+  0 errors | 0 warnings | 0 notes
+* [win-builder results to be added before submission]
 
 ---
 
-## Additional notes
+## Test environments
 
-* The `tern_colon` dataset is derived from `survival::colon`. 'survival'
-  is listed in `Suggests` only and is not required at runtime. The
-  pre-processed dataset is bundled in `data/tern_colon.rda`.
+* Local: macOS Sonoma 14.3, R 4.5.1, aarch64-apple-darwin23.6.0
+* win-builder: Windows Server, R-devel (to be run before submission)
 
-* Eleven exported functions are now available: `ternG()`, `ternD()`, `ternB()`,
-  `ternP()`, `ternStyle()`, `classify_normality()`, `write_methods_doc()`,
-  `write_cleaning_doc()`, `word_export()`, `val_format()`, `val_p_format()`.
-  All follow the same documentation and example standards established in v1.3.1.
+---
+
+## Downstream dependencies
+
+No packages on CRAN currently depend on TernTables.
