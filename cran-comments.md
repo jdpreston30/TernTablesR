@@ -38,14 +38,15 @@ Changes since v1.6.4 are documented in NEWS.md. In brief:
 
 * macOS Sonoma 14.3, R 4.5.1 aarch64-apple-darwin23.6.0 (local) —
   0 errors | 0 warnings | 0 notes
-* [win-builder results to be added before submission]
+* Windows Server 2022, R-devel r90099 x86_64-w64-mingw32 (win-builder) —
+  0 errors | 0 warnings | 0 notes
 
 ---
 
 ## Test environments
 
 * Local: macOS Sonoma 14.3, R 4.5.1, aarch64-apple-darwin23.6.0
-* win-builder: Windows Server, R-devel (to be run before submission)
+* win-builder: Windows Server 2022, R-devel r90099, x86_64-w64-mingw32
 
 ---
 
