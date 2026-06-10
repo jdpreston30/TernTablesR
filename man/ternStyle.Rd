@@ -32,7 +32,8 @@ ternStyle(
   open_doc = TRUE,
   citation = TRUE,
   font_family = getOption("TernTables.font_family", "Arial"),
-  spanner = NULL
+  spanner = NULL,
+  col1_spanner_pos = c("top", "bottom")
 )
 }
 \arguments{
@@ -177,6 +178,10 @@ See \code{\link{word_export}} for details.}
     "Multivariate" = c("Multi HR (95\% CI)", "Multi p")
   )}
   Default \code{NULL} (no spanner row).}
+
+\item{col1_spanner_pos}{Character; \code{"top"} (default) places the first-column header
+label in the spanner row for visual prominence; \code{"bottom"} keeps the classic layout
+with the label in the column-names row. Has no effect when \code{spanner} is \code{NULL}.}
 }
 \value{
 Invisibly returns the input tibble (after renaming and coercion)

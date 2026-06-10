@@ -100,6 +100,12 @@
 #'   will fall back to its default if the font is not installed). Can also be set package-wide
 #'   via \code{options(TernTables.font_family = "Garamond")}.
 #'   Default is \code{"Arial"}.
+#' @param col1_spanner_pos Character; controls where the first-column header label appears
+#'   when \code{spanner} is active. \code{"top"} (default) places the label in the spanner
+#'   row (top-left cell) and leaves the column-names row cell below it empty, giving the
+#'   label more visual prominence. \code{"bottom"} keeps the classic layout where the label
+#'   stays in the column-names row and the spanner row cell above it is blank.
+#'   Has no effect when \code{spanner} is \code{NULL}.
 #' @param spanner Optional named list of column spanners (decked header). Each element name
 #'   is the spanner label text; the value is a character vector of column names from \code{tbl}
 #'   that fall under that spanner. Columns not listed receive an empty spanner cell. The spanner
@@ -138,7 +144,9 @@
 #' )
 #' }
 #' @export
-word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL, font_size = 9, category_start = NULL, plain_header = NULL, subheader_rows = NULL, bold_rows = NULL, bold_sig = NULL, italic_rows = NULL, bold_cols = NULL, italic_cols = NULL, header_format_follow = FALSE, manual_italic_indent = NULL, manual_underline = NULL, table_caption = NULL, table_footnote = NULL, abbreviation_footnote = NULL, posthoc_footnote = NULL, variable_footnote = NULL, index_style = "symbols", page_break_after = FALSE, col1_header = NULL, line_break_header = getOption("TernTables.line_break_header", TRUE), open_doc = TRUE, citation = TRUE, font_family = getOption("TernTables.font_family", "Arial"), spanner = NULL) {
+word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL, font_size = 9, category_start = NULL, plain_header = NULL, subheader_rows = NULL, bold_rows = NULL, bold_sig = NULL, italic_rows = NULL, bold_cols = NULL, italic_cols = NULL, header_format_follow = FALSE, manual_italic_indent = NULL, manual_underline = NULL, table_caption = NULL, table_footnote = NULL, abbreviation_footnote = NULL, posthoc_footnote = NULL, variable_footnote = NULL, index_style = "symbols", page_break_after = FALSE, col1_header = NULL, line_break_header = getOption("TernTables.line_break_header", TRUE), open_doc = TRUE, citation = TRUE, font_family = getOption("TernTables.font_family", "Arial"), spanner = NULL, col1_spanner_pos = c("top", "bottom")) {
+  col1_spanner_pos <- match.arg(col1_spanner_pos)
+
   # Keep the table as-is
   modified_tbl <- tbl
 
@@ -465,6 +473,15 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
 
   if (spanner_added) {
     ft <- add_header_row(ft, values = sp_values, colwidths = sp_colwidths, top = TRUE)
+    # Optionally move the col1 header label into the spanner row (top) or
+    # leave it in the column-names row (bottom, classic behaviour).
+    if (col1_spanner_pos == "top") {
+      col1_display <- colnames(modified_tbl)[1]
+      ft <- compose(ft, i = 1, j = 1, part = "header",
+                    value = as_paragraph(as_chunk(col1_display)))
+      ft <- compose(ft, i = 2, j = 1, part = "header",
+                    value = as_paragraph(as_chunk("")))
+    }
     # Blank out spacer column headers in the column-names row (row 2)
     if (length(spacer_cols) > 0L) {
       spacer_label_args <- setNames(
@@ -565,9 +582,14 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
   # Spacer cells (empty label) naturally get no border, creating the visual gap.
   if (spanner_added) {
     ft <- align(ft, i = 1, align = "center", part = "header")
+    # When col1 label sits in the spanner row, left-align it (it's a label, not a group name)
+    if (col1_spanner_pos == "top") {
+      ft <- align(ft, i = 1, j = 1, align = "left", part = "header")
+    }
     ft <- border(ft, i = 1,
                  border.bottom = fp_border(width = 0),
                  part = "header")
+    # Bottom border only under labeled spanner group cells (col1 gets none)
     col_start <- 1L
     for (s in seq_along(sp_values)) {
       if (nzchar(sp_values[s])) {

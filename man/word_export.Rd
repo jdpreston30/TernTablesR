@@ -33,7 +33,8 @@ word_export(
   open_doc = TRUE,
   citation = TRUE,
   font_family = getOption("TernTables.font_family", "Arial"),
-  spanner = NULL
+  spanner = NULL,
+  col1_spanner_pos = c("top", "bottom")
 )
 }
 \arguments{
@@ -187,6 +188,13 @@ Default is \code{"Arial"}.}
     "Multivariate"  = c("Multi HR (95\% CI)", "Multi p")
   )}
   Default \code{NULL} (no spanner row).}
+
+\item{col1_spanner_pos}{Character; controls where the first-column header label appears
+when \code{spanner} is active. \code{"top"} (default) places the label in the spanner
+row (top-left cell) and leaves the column-names row cell below it empty, giving the
+label more visual prominence. \code{"bottom"} keeps the classic layout where the label
+stays in the column-names row and the spanner row cell above it is blank.
+Has no effect when \code{spanner} is \code{NULL}.}
 }
 \value{
 Invisibly returns the path to the written Word file.

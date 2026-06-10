@@ -27,6 +27,7 @@ ternStyle(
     "Treatment" = c("Tx Mean",   "Tx SD")
   ),
   open_doc = FALSE,
+  col1_spanner_pos = "top",
   citation = FALSE
 )
 message("Test 1 written: test1_basic_spanner.docx")

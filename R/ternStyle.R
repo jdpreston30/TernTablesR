@@ -104,6 +104,9 @@
 #' @param font_family Character; font family name used for all Word output.
 #'   Defaults to \code{getOption("TernTables.font_family", "Arial")}.
 #'   See \code{\link{word_export}} for details.
+#' @param col1_spanner_pos Character; \code{"top"} (default) places the first-column header
+#'   label in the spanner row for visual prominence; \code{"bottom"} keeps the classic layout
+#'   with the label in the column-names row. Has no effect when \code{spanner} is \code{NULL}.
 #' @param spanner Optional named list of column spanners (decked header). Each element name
 #'   is the spanner label; the value is a character vector of column names from \code{tbl}
 #'   that fall under that spanner. Columns not listed receive an empty spanner cell. The spanner
@@ -195,7 +198,8 @@ ternStyle <- function(
     open_doc              = TRUE,
     citation              = TRUE,
     font_family           = getOption("TernTables.font_family", "Arial"),
-    spanner               = NULL
+    spanner               = NULL,
+    col1_spanner_pos      = c("top", "bottom")
 ) {
   stopifnot(is.data.frame(tbl))
   tbl <- tibble::as_tibble(tbl)
@@ -261,7 +265,8 @@ ternStyle <- function(
     open_doc              = open_doc,
     citation              = citation,
     font_family           = font_family,
-    spanner               = spanner
+    spanner               = spanner,
+    col1_spanner_pos      = col1_spanner_pos
   )
 
   # ── Attach ternB_meta so this table can be passed to ternB() ─────────────
@@ -294,6 +299,7 @@ ternStyle <- function(
     header_format_follow  = header_format_follow,
     col1_header           = col1_header,
     spanner               = spanner,
+    col1_spanner_pos      = col1_spanner_pos,
     source                = "ternStyle",
     n_levels              = 1L,
     OR_col                = FALSE,
