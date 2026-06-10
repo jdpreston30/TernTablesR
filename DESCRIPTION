@@ -1,7 +1,7 @@
 Package: TernTables
 Type: Package
 Title: Automated Statistical Analysis and Table Generation for Biomedical Research
-Version: 1.7.2
+Version: 1.7.2.9000
 Authors@R: c(
     person("Joshua D.", "Preston",
            email = "joshua.preston@emory.edu",
