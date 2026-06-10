@@ -433,9 +433,11 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
 
     # Insert a narrow empty spacer column between every pair of adjacent labeled
     # groups so the spanner underlines have a visible gap between them.
+    # NOTE: new_sp_colwidths already accumulates spacer widths (1L each) as gaps
+    # are inserted, so sum(new_sp_colwidths) is always the correct 1-based column
+    # index of the end of the current group in the growing modified_tbl.
     new_sp_values    <- character(0)
     new_sp_colwidths <- integer(0)
-    col_offset       <- 0L   # cumulative spacer columns inserted so far
 
     for (s in seq_along(sp_values)) {
       new_sp_values    <- c(new_sp_values,    sp_values[s])
@@ -445,8 +447,9 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
                      nzchar(sp_values[s]) &&
                      nzchar(sp_values[s + 1L])
       if (need_spacer) {
-        # Column index (1-based in the growing modified_tbl) after the current group
-        insert_at <- sum(new_sp_colwidths) + col_offset
+        # sum(new_sp_colwidths) is already adjusted for all previously-inserted
+        # spacers because their widths (1L each) are appended to new_sp_colwidths.
+        insert_at <- sum(new_sp_colwidths)
 
         empty_col        <- rep("", nrow(modified_tbl))
         modified_tbl     <- dplyr::bind_cols(
@@ -459,7 +462,6 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
 
         new_sp_values    <- c(new_sp_values,    "")
         new_sp_colwidths <- c(new_sp_colwidths, 1L)
-        col_offset       <- col_offset + 1L
       }
     }
 
