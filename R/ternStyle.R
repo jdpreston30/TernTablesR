@@ -104,13 +104,35 @@
 #' @param font_family Character; font family name used for all Word output.
 #'   Defaults to \code{getOption("TernTables.font_family", "Arial")}.
 #'   See \code{\link{word_export}} for details.
+#' @param spanner Optional named list of column spanners (decked header). Each element name
+#'   is the spanner label; the value is a character vector of column names from \code{tbl}
+#'   that fall under that spanner. Columns not listed receive an empty spanner cell. The spanner
+#'   row sits above the column-header row and shares the same grey background and bold styling.
+#'   Supply the column names exactly as they appear in \code{tbl}.
+#'
+#'   To strip redundant group prefixes from column headers (e.g. when the spanner already
+#'   provides the group label), use a \emph{named} inner vector where the \strong{names} are
+#'   the display labels and the \strong{values} are the actual column names in \code{tbl}:
+#'   \preformatted{spanner = list(
+#'     "SLAM"    = c("r" = "SLAM r",    "p" = "SLAM p"),
+#'     "Control" = c("r" = "Control r", "p" = "Control p"),
+#'     "NMN"     = c("r" = "NMN r",     "p" = "NMN p")
+#'   )}
+#'   Unnamed inner vectors leave column headers unchanged:
+#'   \preformatted{spanner = list(
+#'     "Univariate"   = c("Uni HR (95\% CI)", "Uni p"),
+#'     "Multivariate" = c("Multi HR (95\% CI)", "Multi p")
+#'   )}
+#'   Default \code{NULL} (no spanner row).
 #' @return Invisibly returns the input tibble (after renaming and coercion)
 #'   with a \code{"ternB_meta"} attribute attached. This makes the result
 #'   directly passable to \code{\link{ternB}} for bundling with other tables
-#'   into a combined Word document.
+#'   into a combined Word document. Any \code{spanner} definition is stored in
+#'   the metadata and replayed automatically by \code{ternB()}.
 #' @examples
 #' \donttest{
 #' library(tibble)
+#' # Basic usage with section headers
 #' my_tbl <- tibble(
 #'   Variable      = c("Section A", "Row 1", "Row 2", "Section B", "Row 3"),
 #'   `Group 1`     = c("",          "12 (40%)", "18 (60%)", "", "9 (30%)"),
@@ -122,6 +144,26 @@
 #'   subheader_rows  = c("Section A", "Section B"),
 #'   open_doc        = FALSE,
 #'   citation        = FALSE
+#' )
+#'
+#' # Spanner (decked) header grouping related columns
+#' reg_tbl <- tibble(
+#'   Variable            = c("Age (yr)", "BMI"),
+#'   `Uni HR (95% CI)`   = c("1.02 [0.98-1.06]", "1.11 [1.03-1.19]"),
+#'   `Uni p`             = c("0.31", "0.006"),
+#'   `Multi HR (95% CI)` = c("1.01 [0.97-1.05]", "1.08 [1.00-1.17]"),
+#'   `Multi p`           = c("0.64", "0.047")
+#' )
+#' ternStyle(
+#'   tbl         = reg_tbl,
+#'   filename    = file.path(tempdir(), "regression_table.docx"),
+#'   col1_header = "Variable",
+#'   spanner     = list(
+#'     "Univariate"   = c("Uni HR (95% CI)", "Uni p"),
+#'     "Multivariate" = c("Multi HR (95% CI)", "Multi p")
+#'   ),
+#'   open_doc    = FALSE,
+#'   citation    = FALSE
 #' )
 #' }
 #' @export
@@ -152,7 +194,8 @@ ternStyle <- function(
     line_break_header     = FALSE,
     open_doc              = TRUE,
     citation              = TRUE,
-    font_family           = getOption("TernTables.font_family", "Arial")
+    font_family           = getOption("TernTables.font_family", "Arial"),
+    spanner               = NULL
 ) {
   stopifnot(is.data.frame(tbl))
   tbl <- tibble::as_tibble(tbl)
@@ -217,7 +260,8 @@ ternStyle <- function(
     line_break_header     = line_break_header,
     open_doc              = open_doc,
     citation              = citation,
-    font_family           = font_family
+    font_family           = font_family,
+    spanner               = spanner
   )
 
   # ── Attach ternB_meta so this table can be passed to ternB() ─────────────
@@ -249,6 +293,7 @@ ternStyle <- function(
     italic_cols           = italic_cols,
     header_format_follow  = header_format_follow,
     col1_header           = col1_header,
+    spanner               = spanner,
     source                = "ternStyle",
     n_levels              = 1L,
     OR_col                = FALSE,

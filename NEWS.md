@@ -1,3 +1,28 @@
+# TernTables (development)
+
+## New parameters
+
+**`ternStyle()` / `word_export()`**
+
+* `spanner` — Named list for column spanner (decked) headers. Each element name
+  is the spanner label; the value is a character vector of column names that fall
+  under that label. Columns not listed receive an empty spanner cell. The spanner
+  row is rendered above the normal column-header row, inheriting the same grey
+  background, bold font, and bottom-border treatment. Adjacent labeled groups are
+  visually separated by a narrow spacer column. Stored in `ternB_meta` so bundled
+  tables produced via `ternB()` preserve their spanners automatically.
+
+  Inner vectors may be **named** to override the display label in the column-header
+  row without renaming the underlying tibble column — useful when column names carry
+  a group prefix that becomes redundant once the spanner provides context:
+  ```r
+  spanner = list(
+    "SLAM"    = c("r" = "SLAM r",    "p" = "SLAM p"),
+    "Control" = c("r" = "Control r", "p" = "Control p")
+  )
+  # renders: r  p | r  p  under SLAM / Control spanners
+  ```
+
 # TernTables 1.7.2
 
 ## New exported functions

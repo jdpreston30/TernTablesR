@@ -32,7 +32,8 @@ word_export(
   line_break_header = getOption("TernTables.line_break_header", TRUE),
   open_doc = TRUE,
   citation = TRUE,
-  font_family = getOption("TernTables.font_family", "Arial")
+  font_family = getOption("TernTables.font_family", "Arial"),
+  spanner = NULL
 )
 }
 \arguments{
@@ -163,6 +164,29 @@ footnote, and citation. Any font name accepted by the rendering system is valid 
 will fall back to its default if the font is not installed). Can also be set package-wide
 via \code{options(TernTables.font_family = "Garamond")}.
 Default is \code{"Arial"}.}
+
+\item{spanner}{Optional named list of column spanners (decked header). Each element name
+  is the spanner label text; the value is a character vector of column names from \code{tbl}
+  that fall under that spanner. Columns not listed receive an empty spanner cell. The spanner
+  row is rendered above the normal column-header row, inheriting the same grey background,
+  bold font, and border treatment. Supply either the original column names or their post-rename
+  equivalents -- both are resolved.
+
+  To override the display label shown in the column-header row (e.g. to strip a
+  redundant group prefix when the spanner already provides context), use a \emph{named}
+  inner vector where the \strong{names} are the display labels and the \strong{values} are
+  the actual column names in \code{tbl}:
+  \preformatted{spanner = list(
+    "SLAM"    = c("r" = "SLAM r",    "p" = "SLAM p"),
+    "Control" = c("r" = "Control r", "p" = "Control p"),
+    "NMN"     = c("r" = "NMN r",     "p" = "NMN p")
+  )}
+  Unnamed inner vectors (the simple form) leave column headers unchanged:
+  \preformatted{spanner = list(
+    "Univariate"    = c("Uni HR (95\% CI)", "Uni p"),
+    "Multivariate"  = c("Multi HR (95\% CI)", "Multi p")
+  )}
+  Default \code{NULL} (no spanner row).}
 }
 \value{
 Invisibly returns the path to the written Word file.

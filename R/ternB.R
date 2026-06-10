@@ -127,6 +127,7 @@ ternB <- function(tables, output_docx, page_break = TRUE,
         italic_cols           = meta$italic_cols,
         header_format_follow  = if (is.null(meta$header_format_follow)) FALSE else meta$header_format_follow,
         col1_header           = meta$col1_header,
+        spanner               = meta$spanner,
         page_break_after      = (i < length(temp_files)) && isTRUE(page_break),
         open_doc              = FALSE,
         citation              = FALSE,   # temp files only; prevents section-property bleed into combined doc

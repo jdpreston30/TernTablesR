@@ -256,9 +256,51 @@ custom <- tibble::tibble(
   Value    = c("47", "28.3 [18.1, 40.2]")
 )
 ternStyle(
-  tbl         = custom,
-  output_docx = "custom_table.docx"
+  tbl      = custom,
+  filename = "custom_table.docx"
 )
+```
+
+Use the `spanner` argument to add a decked (two-level) header — a labelled row above the column names that groups related columns:
+
+```r
+results <- tibble::tibble(
+  Variable          = c("Age (yr)", "BMI"),
+  `Uni HR (95% CI)` = c("1.02 [0.98–1.06]", "1.11 [1.03–1.19]"),
+  `Uni p`           = c("0.31", "0.006"),
+  `Multi HR (95% CI)` = c("1.01 [0.97–1.05]", "1.08 [1.00–1.17]"),
+  `Multi p`           = c("0.64", "0.047")
+)
+ternStyle(
+  tbl      = results,
+  filename = "regression_table.docx",
+  spanner  = list(
+    "Univariate"   = c("Uni HR (95% CI)", "Uni p"),
+    "Multivariate" = c("Multi HR (95% CI)", "Multi p")
+  )
+)
+```
+
+When the spanner already provides the group label, use a **named** inner vector to strip the redundant prefix from the column-header row (`names` = display label, `values` = actual column name):
+
+```r
+cor_tbl <- tibble::tibble(
+  Variable    = c("Gene A", "Gene B"),
+  `SLAM r`    = c("0.42", "-0.18"),
+  `SLAM p`    = c("0.031", "0.214"),
+  `Control r` = c("0.11", "0.05"),
+  `Control p` = c("0.401", "0.712")
+)
+ternStyle(
+  tbl      = cor_tbl,
+  filename = "correlation_table.docx",
+  spanner  = list(
+    "SLAM"    = c("r" = "SLAM r",    "p" = "SLAM p"),
+    "Control" = c("r" = "Control r", "p" = "Control p")
+  )
+)
+# Rendered header: SLAM | Control  (spanner row)
+#                  r  p | r  p     (column-names row)
 ```
 
 ### `classify_normality()` — Inspect normality routing per variable

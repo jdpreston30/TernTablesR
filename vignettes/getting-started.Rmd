@@ -558,10 +558,57 @@ custom <- tibble::tibble(
 ternStyle(
   tbl           = custom,
   table_caption = "Table S1. Study overview.",
-  output_docx   = file.path(out_dir, "Tern_custom.docx"),
+  filename      = file.path(out_dir, "Tern_custom.docx"),
   open_doc      = FALSE,
   citation      = FALSE
 )
+```
+
+Use `spanner` to add a decked (two-level) header that groups related columns under a shared label \u2014 useful for regression tables with paired univariate / multivariate columns:
+
+```{r ternStyle-spanner, eval = FALSE}
+results <- tibble::tibble(
+  Variable            = c("Age (yr)", "BMI"),
+  `Uni HR (95% CI)`   = c("1.02 [0.98\u20131.06]", "1.11 [1.03\u20131.19]"),
+  `Uni p`             = c("0.31",  "0.006"),
+  `Multi HR (95% CI)` = c("1.01 [0.97\u20131.05]", "1.08 [1.00\u20131.17]"),
+  `Multi p`           = c("0.64",  "0.047")
+)
+ternStyle(
+  tbl      = results,
+  filename = file.path(out_dir, "Tern_regression.docx"),
+  spanner  = list(
+    "Univariate"   = c("Uni HR (95% CI)", "Uni p"),
+    "Multivariate" = c("Multi HR (95% CI)", "Multi p")
+  ),
+  open_doc = FALSE,
+  citation = FALSE
+)
+```
+
+When column names contain a redundant group prefix (e.g. `"SLAM \u03c1"`, `"Control \u03c1"`), use a **named** inner vector to override the display label in the column-header row while keeping the actual column names unique in the tibble. The `names` of the inner vector become the displayed header text; the `values` are the real column names:
+
+```{r ternStyle-spanner-named, eval = FALSE}
+cor_tbl <- tibble::tibble(
+  Variable    = c("Gene A", "Gene B", "Gene C"),
+  `SLAM r`    = c("0.42",  "-0.18",  "0.67"),
+  `SLAM p`    = c("0.031", "0.214",  "< 0.001"),
+  `Control r` = c("0.11",  "0.05",   "0.38"),
+  `Control p` = c("0.401", "0.712",  "0.044")
+)
+ternStyle(
+  tbl         = cor_tbl,
+  filename    = file.path(out_dir, "Tern_correlation.docx"),
+  col1_header = "Gene",
+  spanner     = list(
+    "SLAM"    = c("r" = "SLAM r", "p" = "SLAM p"),
+    "Control" = c("r" = "Control r", "p" = "Control p")
+  ),
+  open_doc = FALSE,
+  citation = FALSE
+)
+# Spanner row:      SLAM  |  Control
+# Column-names row: r  p  |  r  p
 ```
 
 ---

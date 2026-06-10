@@ -100,6 +100,28 @@
 #'   will fall back to its default if the font is not installed). Can also be set package-wide
 #'   via \code{options(TernTables.font_family = "Garamond")}.
 #'   Default is \code{"Arial"}.
+#' @param spanner Optional named list of column spanners (decked header). Each element name
+#'   is the spanner label text; the value is a character vector of column names from \code{tbl}
+#'   that fall under that spanner. Columns not listed receive an empty spanner cell. The spanner
+#'   row is rendered above the normal column-header row, inheriting the same grey background,
+#'   bold font, and border treatment. Supply either the original column names or their post-rename
+#'   equivalents -- both are resolved.
+#'
+#'   To override the display label shown in the column-header row (e.g. to strip a
+#'   redundant group prefix when the spanner already provides context), use a \emph{named}
+#'   inner vector where the \strong{names} are the display labels and the \strong{values} are
+#'   the actual column names in \code{tbl}:
+#'   \preformatted{spanner = list(
+#'     "SLAM"    = c("r" = "SLAM r",    "p" = "SLAM p"),
+#'     "Control" = c("r" = "Control r", "p" = "Control p"),
+#'     "NMN"     = c("r" = "NMN r",     "p" = "NMN p")
+#'   )}
+#'   Unnamed inner vectors (the simple form) leave column headers unchanged:
+#'   \preformatted{spanner = list(
+#'     "Univariate"    = c("Uni HR (95\% CI)", "Uni p"),
+#'     "Multivariate"  = c("Multi HR (95\% CI)", "Multi p")
+#'   )}
+#'   Default \code{NULL} (no spanner row).
 #' @return Invisibly returns the path to the written Word file.
 #' @examples
 #' \donttest{
@@ -116,7 +138,7 @@
 #' )
 #' }
 #' @export
-word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL, font_size = 9, category_start = NULL, plain_header = NULL, subheader_rows = NULL, bold_rows = NULL, bold_sig = NULL, italic_rows = NULL, bold_cols = NULL, italic_cols = NULL, header_format_follow = FALSE, manual_italic_indent = NULL, manual_underline = NULL, table_caption = NULL, table_footnote = NULL, abbreviation_footnote = NULL, posthoc_footnote = NULL, variable_footnote = NULL, index_style = "symbols", page_break_after = FALSE, col1_header = NULL, line_break_header = getOption("TernTables.line_break_header", TRUE), open_doc = TRUE, citation = TRUE, font_family = getOption("TernTables.font_family", "Arial")) {
+word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL, font_size = 9, category_start = NULL, plain_header = NULL, subheader_rows = NULL, bold_rows = NULL, bold_sig = NULL, italic_rows = NULL, bold_cols = NULL, italic_cols = NULL, header_format_follow = FALSE, manual_italic_indent = NULL, manual_underline = NULL, table_caption = NULL, table_footnote = NULL, abbreviation_footnote = NULL, posthoc_footnote = NULL, variable_footnote = NULL, index_style = "symbols", page_break_after = FALSE, col1_header = NULL, line_break_header = getOption("TernTables.line_break_header", TRUE), open_doc = TRUE, citation = TRUE, font_family = getOption("TernTables.font_family", "Arial"), spanner = NULL) {
   # Keep the table as-is
   modified_tbl <- tbl
 
@@ -343,18 +365,121 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
     }
   }
   colnames(modified_tbl) <- new_colnames
-  
+
+  # Save post-rename colnames before any spanner spacer columns are inserted;
+  # used below by bold_sig name resolution so lengths stay consistent.
+  pre_spanner_colnames <- colnames(modified_tbl)
+
   # Detect which statistical tests were actually used
   has_test_column <- "test" %in% colnames(tbl)
   tests_used <- character(0)
-  
+
   if (has_test_column) {
     tests_used <- unique(tbl$test)
     tests_used <- tests_used[!is.na(tests_used) & tests_used != "" & tests_used != "-"]
   }
-  
-  # Create flextable
-  ft <- flextable(modified_tbl) %>%
+
+  # ── Spanner (column group header) row ────────────────────────────────────
+  # Preparation happens BEFORE flextable() so spacer columns can be inserted
+  # into modified_tbl; sp_values / sp_colwidths are hoisted for the post-bold
+  # border pass.
+  spanner_added      <- FALSE
+  sp_values          <- NULL
+  sp_colwidths       <- NULL
+  spacer_cols        <- integer(0)
+  spanner_col_display <- list()  # actual_colname -> display label overrides
+  if (!is.null(spanner) && is.list(spanner) && length(spanner) > 0) {
+    n_cols <- ncol(modified_tbl)
+    col_spanner_label <- rep("", n_cols)
+
+    for (sp_label in names(spanner)) {
+      inner         <- spanner[[sp_label]]
+      display_names <- names(inner)   # NULL when inner vector is unnamed
+      for (i in seq_along(inner)) {
+        cname <- inner[[i]]
+        # Resolve against post-rename colnames first, then original colnames
+        pos <- which(colnames(modified_tbl) == cname)
+        if (length(pos) == 0L) pos <- which(original_colnames == cname)
+        if (length(pos) > 0L) {
+          col_spanner_label[pos[1L]] <- sp_label
+          # Capture display-label override when the inner vector is named
+          if (!is.null(display_names) && nzchar(display_names[i])) {
+            spanner_col_display[[ colnames(modified_tbl)[pos[1L]] ]] <- display_names[i]
+          }
+        }
+      }
+    }
+
+    # Collapse consecutive same-label columns into merged spanner cells
+    sp_values    <- character(0)
+    sp_colwidths <- integer(0)
+    k <- 1L
+    while (k <= n_cols) {
+      lbl <- col_spanner_label[k]
+      m   <- k
+      while (m < n_cols && col_spanner_label[m + 1L] == lbl) m <- m + 1L
+      sp_values    <- c(sp_values,    lbl)
+      sp_colwidths <- c(sp_colwidths, m - k + 1L)
+      k <- m + 1L
+    }
+
+    # Insert a narrow empty spacer column between every pair of adjacent labeled
+    # groups so the spanner underlines have a visible gap between them.
+    new_sp_values    <- character(0)
+    new_sp_colwidths <- integer(0)
+    col_offset       <- 0L   # cumulative spacer columns inserted so far
+
+    for (s in seq_along(sp_values)) {
+      new_sp_values    <- c(new_sp_values,    sp_values[s])
+      new_sp_colwidths <- c(new_sp_colwidths, sp_colwidths[s])
+
+      need_spacer <- s < length(sp_values) &&
+                     nzchar(sp_values[s]) &&
+                     nzchar(sp_values[s + 1L])
+      if (need_spacer) {
+        # Column index (1-based in the growing modified_tbl) after the current group
+        insert_at <- sum(new_sp_colwidths) + col_offset
+
+        empty_col        <- rep("", nrow(modified_tbl))
+        modified_tbl     <- dplyr::bind_cols(
+          modified_tbl[, seq_len(insert_at),               drop = FALSE],
+          tibble::tibble(.sp_gap = empty_col),
+          modified_tbl[, seq(insert_at + 1L, ncol(modified_tbl)), drop = FALSE]
+        )
+        spacer_col_idx   <- insert_at + 1L
+        spacer_cols      <- c(spacer_cols, spacer_col_idx)
+
+        new_sp_values    <- c(new_sp_values,    "")
+        new_sp_colwidths <- c(new_sp_colwidths, 1L)
+        col_offset       <- col_offset + 1L
+      }
+    }
+
+    sp_values    <- new_sp_values
+    sp_colwidths <- new_sp_colwidths
+    spanner_added <- TRUE
+  }
+
+  # Create flextable (after modified_tbl has been updated with any spacer cols)
+  ft <- flextable(modified_tbl)
+
+  if (spanner_added) {
+    ft <- add_header_row(ft, values = sp_values, colwidths = sp_colwidths, top = TRUE)
+    # Blank out spacer column headers in the column-names row (row 2)
+    if (length(spacer_cols) > 0L) {
+      spacer_label_args <- setNames(
+        as.list(rep("", length(spacer_cols))),
+        colnames(modified_tbl)[spacer_cols]
+      )
+      ft <- do.call(set_header_labels, c(list(x = ft), spacer_label_args))
+    }
+    # Apply display-label overrides (named inner vectors in spanner)
+    if (length(spanner_col_display) > 0L) {
+      ft <- do.call(set_header_labels, c(list(x = ft), spanner_col_display))
+    }
+  }
+
+  ft <- ft %>%
     font(fontname = font_family, part = "all") %>%
     fontsize(size = font_size, part = "all") %>%
     bg(bg = "#cdcdcd", part = "header") %>%
@@ -434,7 +559,26 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
   
   # Bold header row - don't change alignment here
   ft <- ft %>% bold(part = "header")
-  
+
+  # Center-align the spanner row and apply selective bottom borders.
+  # Strip all borders from the spanner row, then re-add only under labeled cells.
+  # Spacer cells (empty label) naturally get no border, creating the visual gap.
+  if (spanner_added) {
+    ft <- align(ft, i = 1, align = "center", part = "header")
+    ft <- border(ft, i = 1,
+                 border.bottom = fp_border(width = 0),
+                 part = "header")
+    col_start <- 1L
+    for (s in seq_along(sp_values)) {
+      if (nzchar(sp_values[s])) {
+        ft <- border(ft, i = 1, j = col_start,
+                     border.bottom = fp_border(color = "black", width = 0.75),
+                     part = "header")
+      }
+      col_start <- col_start + sp_colwidths[s]
+    }
+  }
+
   # Format category header rows if they exist
   if (!is.null(category_rows) && length(category_rows) > 0) {
     base_padding <- 3
@@ -512,7 +656,7 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
     bsig_hr_cols   <- bold_sig$hr_cols  # may be NULL
 
     # Build map: original column name → renamed column name
-    bsig_name_map  <- setNames(colnames(modified_tbl), original_colnames)
+    bsig_name_map  <- setNames(pre_spanner_colnames, original_colnames)
 
     # Resolve a user-supplied column name to its renamed equivalent:
     # 1. If the name appears directly in modified_tbl columns, use it as-is.
@@ -572,6 +716,10 @@ word_export <- function(tbl, filename, round_intg = FALSE, round_decimal = NULL,
   page_width_in <- 6.5
   if (!is.null(ft_dims$widths) && sum(ft_dims$widths) > page_width_in) {
     ft <- flextable::fit_to_width(ft, max_width = page_width_in)
+  }
+  # Force spacer columns to stay narrow after autofit/fit_to_width
+  if (length(spacer_cols) > 0L) {
+    ft <- width(ft, j = spacer_cols, width = 0.07)
   }
   ft <- ft %>%
     height(height = font_size / 72 * 1.5, part = "body") %>%

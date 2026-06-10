@@ -19,6 +19,7 @@
 ^CRAN-SUBMISSION$
 ^CRAN-checklist\.R$
 ^development$
+^test$
 ^Beamer$
 ^test\.csv$
 ^feature\.R$
