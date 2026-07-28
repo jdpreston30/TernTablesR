@@ -53,7 +53,8 @@ ternG(
   percentage_compute = "column",
   categorical_posthoc = FALSE,
   show_missingness = FALSE,
-  missing_indicators = NULL
+  missing_indicators = NULL,
+  plain_tibble = FALSE
 )
 }
 \arguments{
@@ -299,10 +300,25 @@ the ternP canonical list is used (\code{"na"}, \code{"n/a"}, \code{"unknown"}, e
 When supplied, the custom list \strong{replaces} the ternP defaults — only the values
 in \code{missing_indicators} (plus true \code{NA}) are counted as missing. Matching is
 always case-insensitive and ignores leading/trailing whitespace.}
+
+\item{plain_tibble}{Logical; if \code{TRUE}, returns the tidy per-variable statistics frame
+(see \code{\link{tern_stats}}) instead of the formatted display table — one un-indented row
+per variable with raw numeric statistics and their formatted counterparts in adjacent
+columns. Word/Excel exports and the methods document are still written if requested.
+Setting this is never required to reach the tidy data: the same frame is always attached
+to the normal return value as the \code{"tern_stats"} attribute, so
+\code{tern_stats(ternG(...))} yields both the pretty table and the tidy data from one call.
+Default is \code{FALSE}.}
 }
 \value{
 A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 P values, test type, and optionally odds ratios and total summary column.
+Two tidy, machine-readable frames are always attached as attributes:
+\code{"tern_stats"} (one row per variable — test, statistic, df, raw numeric P value,
+normality decision, odds ratio) and \code{"tern_estimates"} (long format: one row per
+variable x group x level, with the underlying counts, percentages, means, SDs, medians and
+quartiles). Access them with \code{\link{tern_stats}} and \code{\link{tern_estimates}}
+rather than parsing the display table.
 }
 \description{
 Creates a grouped summary table with optional statistical testing for group
@@ -357,4 +373,7 @@ ternG(tern_colon,
                          "Tumor Characteristics" = "Positive Lymph Nodes (n)"))
 }
 
+}
+\seealso{
+\code{\link{tern_stats}}, \code{\link{tern_estimates}}
 }

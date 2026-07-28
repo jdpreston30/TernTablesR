@@ -133,6 +133,16 @@
 #'   in addition to (or instead of) the built-in ternP defaults. When \code{NULL} (default),
 #'   the ternP canonical list is used. When supplied, the custom list \strong{replaces} the
 #'   ternP defaults. Matching is case-insensitive and trims whitespace.
+#' @param plain_tibble Logical; if \code{TRUE}, returns the tidy per-variable statistics frame
+#'   (see \code{\link{tern_stats}}) instead of the formatted display table — one un-indented row
+#'   per variable with raw numeric statistics and their formatted counterparts in adjacent
+#'   columns. Word/Excel exports and the methods document are still written if requested.
+#'   Setting this is never required to reach the tidy data: the same frame is always attached
+#'   to the normal return value as the \code{"tern_stats"} attribute, so
+#'   \code{tern_stats(ternD(...))} yields both the pretty table and the tidy data from one call.
+#'   Since \code{ternD()} performs no group comparison, the test-related columns
+#'   (\code{test}, \code{statistic}, \code{df}, \code{p_value}) are \code{NA}.
+#'   Default is \code{FALSE}.
 #'
 #' @details
 #' The function always returns a tibble with a single \code{Total (N = n)} column format, regardless of the
@@ -157,6 +167,14 @@
 #'   \item{Total (N = n)}{Summary statistics (mean +/- SD, median [IQR], or n (\%) as appropriate)}
 #'   \item{SW_p}{Shapiro-Wilk P values (only if \code{print_normality = TRUE})}
 #' }
+#' Two tidy, machine-readable frames are always attached as attributes:
+#' \code{"tern_stats"} (one row per variable — summary type, n, normality decision,
+#' Shapiro-Wilk P) and \code{"tern_estimates"} (long format: the underlying counts,
+#' percentages, means, SDs, medians and quartiles behind each displayed cell). Access them
+#' with \code{\link{tern_stats}} and \code{\link{tern_estimates}} rather than parsing the
+#' display table.
+#'
+#' @seealso \code{\link{tern_stats}}, \code{\link{tern_estimates}}
 #'
 #' @examples
 #' data(tern_colon)
@@ -205,7 +223,8 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
                   show_missing = FALSE,
                   zero_to_dash = FALSE,
                   show_missingness = FALSE,
-                  missing_indicators = NULL) {
+                  missing_indicators = NULL,
+                  plain_tibble = FALSE) {
   stopifnot(is.data.frame(data))
 
   # ── Validate show_missingness ───────────────────────────────────────────
@@ -239,25 +258,30 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
     vars <- setdiff(names(data), exclude_vars)
   }
 
-  fmt_mean_sd <- function(x) {
+  # Both formatters return the raw statistics alongside the display string, so
+  # the tidy side-channel (see R/utils_stats_tidy.R) reports un-rounded values
+  # without ever recomputing them.
+  calc_mean_sd <- function(x) {
     m <- mean(x, na.rm = TRUE)
     s <- stats::sd(x, na.rm = TRUE)
     dp <- if (!is.null(round_decimal)) as.integer(round_decimal) else 1L
-    if (round_intg) {
+    fmt <- if (round_intg) {
       paste0(round_up_half(m, 0), " \u00b1 ", round_up_half(s, 0))
     } else {
       paste0(round(m, dp), " \u00b1 ", round(s, dp))
     }
+    list(mean = m, sd = s, fmt = fmt)
   }
 
-  fmt_median_iqr <- function(x) {
+  calc_median_iqr <- function(x) {
     q <- stats::quantile(x, probs = c(0.25, 0.5, 0.75), na.rm = TRUE, names = FALSE)
     dp <- if (!is.null(round_decimal)) as.integer(round_decimal) else 1L
-    if (round_intg) {
+    fmt <- if (round_intg) {
       paste0(round_up_half(q[2], 0), " [", round_up_half(q[1], 0), "\u2013", round_up_half(q[3], 0), "]")
     } else {
       paste0(round(q[2], dp), " [", round(q[1], dp), "\u2013", round(q[3], dp), "]")
     }
+    list(median = q[2], q1 = q[1], q3 = q[3], fmt = fmt)
   }
 
   shapiro_p <- function(x) {
@@ -312,6 +336,8 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
         # all missing
         out <- tibble::tibble(Variable = .clean_variable_name_for_header(var), .indent = 2, Summary = "0 (0%)")
         if (print_normality) out$SW_p <- NA_real_
+        .record_stats(variable = var, label = out$Variable[1], type = "categorical",
+                      stat_type = "n_pct", n = 0L, n_missing = length(v), n_levels = 0L)
         return(.add_miss_col_d(dplyr::bind_rows(out, .make_missing_row())))
       }
       pct <- round(100 * prop.table(tab))
@@ -396,6 +422,26 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
         rows <- list(row)
         out <- dplyr::bind_rows(rows)
       }
+
+      # ── Tidy side-channel: categorical ──────────────────────────────────────
+      .record_stats(
+        variable  = var,
+        label     = out$Variable[1],
+        type      = "categorical",
+        stat_type = "n_pct",
+        n         = sum(tab),
+        n_missing = sum(is.na(v)),
+        n_levels  = length(tab)
+      )
+      # Every level is emitted, including levels the display collapses away
+      # (a binary Y/N variable renders only the "Y" row).
+      for (lvl in names(tab)) {
+        .record_est(
+          variable = var, label = out$Variable[1], group = "Total", level = lvl,
+          n = as.integer(tab[[lvl]]), pct = pct[[lvl]],
+          value_fmt = paste0(as.integer(tab[[lvl]]), " (", pct[[lvl]], "%)")
+        )
+      }
       return(.add_miss_col_d(dplyr::bind_rows(out, .make_missing_row())))
     }
 
@@ -404,55 +450,100 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
     # Always run Shapiro-Wilk (used for print_normality column and TRUE/ROBUST Gate 4)
     sw <- shapiro_p(x)
 
+    # `norm_verdict` records the normality decision that actually drove the
+    # display: NA where the variable was forced and its distribution never
+    # decided the format.
+    norm_verdict <- NA
     # Check if variable is forced to be ordinal
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
       # Force ordinal: use median/IQR regardless of consider_normality setting
       .ternD_env$norm_tested <- .ternD_env$norm_tested + 1L
       .ternD_env$norm_failed <- .ternD_env$norm_failed + 1L
-      summary_str <- fmt_median_iqr(x)
+      summary_vals <- calc_median_iqr(x)
     } else if (!is.null(force_normal) && var %in% force_normal) {
       # Force parametric: use mean/SD regardless of consider_normality setting
       .ternD_env$norm_tested <- .ternD_env$norm_tested + 1L
-      summary_str <- fmt_mean_sd(x)
+      summary_vals <- calc_mean_sd(x)
     } else if (consider_normality == "ROBUST") {
       # ROBUST: four-gate decision tree — see R/utils_normality.R
       .ternD_env$norm_tested <- .ternD_env$norm_tested + 1L
       robust_result <- .robust_normality(list(x))
+      norm_verdict  <- isTRUE(robust_result$is_normal)
       if (!robust_result$is_normal) {
         .ternD_env$norm_failed <- .ternD_env$norm_failed + 1L
-        summary_str <- fmt_median_iqr(x)
+        summary_vals <- calc_median_iqr(x)
       } else {
-        summary_str <- fmt_mean_sd(x)
+        summary_vals <- calc_mean_sd(x)
       }
     } else if (isTRUE(consider_normality)) {
       .ternD_env$norm_tested <- .ternD_env$norm_tested + 1L
       if (is.na(sw) || sw < 0.05) .ternD_env$norm_failed <- .ternD_env$norm_failed + 1L
       # choose mean +- SD if normal; else median [IQR]
-      if (!is.na(sw) && sw > 0.05) {
-        summary_str <- fmt_mean_sd(x)
+      norm_verdict <- !is.na(sw) && sw > 0.05
+      if (norm_verdict) {
+        summary_vals <- calc_mean_sd(x)
       } else {
-        summary_str <- fmt_median_iqr(x)
+        summary_vals <- calc_median_iqr(x)
       }
     } else {
       .ternD_env$norm_tested <- .ternD_env$norm_tested + 1L
       if (is.na(sw) || sw < 0.05) .ternD_env$norm_failed <- .ternD_env$norm_failed + 1L
       # Default behavior when consider_normality = FALSE: use mean +/- SD
-      summary_str <- fmt_mean_sd(x)
+      summary_vals <- calc_mean_sd(x)
     }
-    
+    summary_str <- summary_vals$fmt
+
     out <- tibble::tibble(
       Variable = .clean_variable_name_for_header(var),
       .indent  = 2L,
       Summary  = summary_str
     )
     if (print_normality) out$SW_p <- sw
+
+    # ── Tidy side-channel: continuous ─────────────────────────────────────────
+    is_mean_sd <- !is.null(summary_vals$mean)
+    .record_stats(
+      variable  = var,
+      label     = out$Variable[1],
+      type      = "continuous",
+      stat_type = if (is_mean_sd) "mean_sd" else "median_iqr",
+      n         = sum(!is.na(x)),
+      n_missing = sum(is.na(x)),
+      is_normal = norm_verdict,
+      sw_p      = sw
+    )
+    .record_est(
+      variable  = var, label = out$Variable[1], group = "Total",
+      n         = sum(!is.na(x)),
+      mean      = if (is_mean_sd) summary_vals$mean else NA_real_,
+      sd        = if (is_mean_sd) summary_vals$sd   else NA_real_,
+      median    = if (is_mean_sd) NA_real_ else summary_vals$median,
+      q1        = if (is_mean_sd) NA_real_ else summary_vals$q1,
+      q3        = if (is_mean_sd) NA_real_ else summary_vals$q3,
+      value_fmt = summary_str
+    )
     return(.add_miss_col_d(dplyr::bind_rows(out, .make_missing_row())))
   }
 
   .ternD_env <- new.env(parent = emptyenv())
   .ternD_env$norm_tested <- 0L
   .ternD_env$norm_failed <- 0L
+  # ── Tidy statistics side-channel (see R/utils_stats_tidy.R) ────────────────
+  .ternD_env$stats_records <- list()
+  .ternD_env$est_records   <- list()
+  .record_stats <- function(...) {
+    .ternD_env$stats_records <- c(.ternD_env$stats_records, list(.tern_stat_row(...)))
+    invisible(NULL)
+  }
+  .record_est <- function(...) {
+    .ternD_env$est_records <- c(.ternD_env$est_records, list(.tern_est_row(...)))
+    invisible(NULL)
+  }
+
   out_tbl <- dplyr::bind_rows(lapply(vars, function(v) summarize_variable(data, v)))
+
+  stats_tbl <- .tern_bind_stats(.ternD_env$stats_records)
+  est_tbl   <- .tern_bind_est(.ternD_env$est_records)
 
   # Extract accumulator values from environment for reporting
   norm_tested <- .ternD_env$norm_tested
@@ -517,6 +608,11 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
         out_tbl$Variable[i] <- .apply_cleaning_rules(current_var)
       }
     }
+    # Keep the tidy frames' display labels in step with the rendered table.
+    if (nrow(stats_tbl) > 0L)
+      stats_tbl$label <- vapply(stats_tbl$label, .apply_cleaning_rules, character(1), USE.NAMES = FALSE)
+    if (nrow(est_tbl) > 0L)
+      est_tbl$label <- vapply(est_tbl$label, .apply_cleaning_rules, character(1), USE.NAMES = FALSE)
   }
 
   # Replace "0 (NaN%)" with "-" for structurally impossible cells
@@ -588,6 +684,17 @@ ternD <- function(data, vars = NULL, exclude_vars = NULL, force_ordinal = NULL,
     show_missingness      = show_missingness,
     missing_indicators    = missing_indicators
   )
+
+  # Attach the tidy side-channel. Always attached (it is cheap) so a single call
+  # yields the formatted table plus machine-readable results — see tern_stats().
+  attr(out_tbl, "tern_stats")     <- stats_tbl
+  attr(out_tbl, "tern_estimates") <- est_tbl
+
+  if (isTRUE(plain_tibble)) {
+    attr(stats_tbl, "tern_stats")     <- stats_tbl
+    attr(stats_tbl, "tern_estimates") <- est_tbl
+    return(stats_tbl)
+  }
 
   out_tbl
 }

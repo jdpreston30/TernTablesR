@@ -1,7 +1,7 @@
 Package: TernTables
 Type: Package
 Title: Automated Statistical Analysis and Table Generation for Biomedical Research
-Version: 1.7.2.9003
+Version: 1.7.2.9004
 Authors@R: c(
     person("Joshua D.", "Preston",
            email = "joshua.preston@emory.edu",
@@ -16,6 +16,9 @@ Authors@R: c(
     person("Clayton J.", "Rust",
            role = "aut",
            comment = c(ORCID = "0000-0001-5929-0733")),
+    person("John W.", "O'Neill",
+           role = "aut",
+           comment = c(ORCID = "0009-0001-8669-4925")),
     person("Michael E.", "Halkos",
            role = "aut",
            comment = c(ORCID = "0000-0001-9191-7743")),

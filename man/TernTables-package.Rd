@@ -88,6 +88,7 @@ Authors:
   \item Helen Abadiotakis (\href{https://orcid.org/0009-0002-8268-927X}{ORCID})
   \item Ailin Tang (\href{https://orcid.org/0009-0007-8715-1678}{ORCID})
   \item Clayton J. Rust (\href{https://orcid.org/0000-0001-5929-0733}{ORCID})
+  \item John W. O'Neill (\href{https://orcid.org/0009-0001-8669-4925}{ORCID})
   \item Michael E. Halkos (\href{https://orcid.org/0000-0001-9191-7743}{ORCID})
   \item Mani A. Daneshmand (\href{https://orcid.org/0000-0002-0191-9911}{ORCID})
   \item Joshua L. Chan (\href{https://orcid.org/0000-0001-7220-561X}{ORCID})

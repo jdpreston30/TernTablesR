@@ -1,6 +1,50 @@
 # TernTables (development)
 
+## New exported functions
+
+* **`tern_stats()`**: Returns the tidy, machine-readable record of everything
+  `ternG()`/`ternD()` computed while building the display table — one un-indented
+  row per variable, keyed by the **original** data column name. Raw statistics stay
+  numeric and un-rounded (`p_value`, `statistic`, `df`, `df2`, `or_value`,
+  `or_lcl`, `or_ucl`, `sw_p`) with the publication-formatted string in an adjacent
+  column (`p_fmt`, `or_fmt`), alongside `label`, `type`, `stat_type`, `n`,
+  `n_missing`, `n_levels`, `test`, `test_note`, `is_normal`, `or_method`, and
+  `p_adjusted`/`p_adjusted_fmt` when `p_adjust = TRUE`.
+
+  This removes the need to parse the rendered table to consume results
+  programmatically — no walking the internal `.indent` column, no allowing for the
+  fact that continuous and categorical variables park their test results on
+  differently-shaped rows, and no fuzzy-matching around `smart_rename`'s
+  display-name cleaning. Every value is populated from the same test object that
+  produced the corresponding display cell, so the tidy frame cannot drift from the
+  rendered table. Statistical fields are recorded even when `show_p = FALSE` or
+  `show_test = FALSE` suppress them from the display.
+
+  ```r
+  tbl <- ternG(data, group_var = "Variant", methods_doc = FALSE)
+  tern_stats(tbl) |> dplyr::filter(variable %in% c("Age_Years", "Sex"))
+  ```
+
+* **`tern_estimates()`**: Long-format companion to `tern_stats()` — one row per
+  variable × group × level holding the raw summary values behind each displayed
+  cell (`n`, `pct`, `mean`, `sd`, `median`, `q1`, `q3`) plus the exact rendered
+  string in `value_fmt`. Every factor level is reported, including levels the
+  display collapses away (a binary Y/N variable renders only the "Y" row but
+  reports both levels here).
+
+Both frames are attached to every `ternG()`/`ternD()` result as the `"tern_stats"`
+and `"tern_estimates"` attributes, so a single call yields the formatted table and
+the tidy data together.
+
 ## New parameters
+
+**`ternG()` / `ternD()`**
+
+* `plain_tibble` — When `TRUE`, returns the tidy per-variable statistics frame
+  (see `tern_stats()`) instead of the formatted display table. Word/Excel exports
+  and the methods document are still written if requested. Never required to reach
+  the tidy data, since the same frame is always attached as an attribute; provided
+  for callers who want the plain frame as the return value.
 
 **`ternStyle()` / `word_export()`**
 
@@ -22,6 +66,34 @@
   )
   # renders: r  p | r  p  under SLAM / Control spanners
   ```
+
+## Bug fixes
+
+**`ternG()`**
+
+* `force_continuous` was silently ignored whenever the listed variable failed
+  normality assessment. When a continuous variable is routed to non-parametric
+  treatment, `ternG()` re-enters its internal summarizer through the
+  `force_ordinal` path; that recursion did not carry `force_continuous` with it,
+  so the automatic binary 0/1 detection fired on the second pass and converted the
+  variable to categorical Y/N — producing `n (%)` with a chi-squared or Fisher's
+  exact test, precisely the treatment `force_continuous` exists to prevent.
+
+  Under the default `consider_normality = "ROBUST"` this affected two of the three
+  routing gates, so the argument only worked for large, balanced 0/1 variables:
+
+  - Gate 3 (all groups n ≥ 30, CLT) — parametric, no recursion, worked correctly.
+  - Gate 2 (|skewness| > 2) — fired for rare binary exposures, so the flag was ignored.
+  - Gate 4 (Shapiro-Wilk) — always rejects on 0/1 data, so the flag was ignored for
+    any comparison with fewer than 30 observations per group.
+
+  Affected variables now render as median [IQR] with Wilcoxon rank-sum (2 groups) or
+  Kruskal-Wallis (3+ groups), consistent with non-normal continuous treatment.
+  **This changes rendered output** for tables that set `force_continuous` on a
+  variable that fails normality; the reported P value changes from a
+  contingency-table test to a rank-based one. Calls that do not set
+  `force_continuous` are unaffected. `ternD()` was never affected — it resolves
+  `force_ordinal` inline and has no equivalent recursion.
 
 # TernTables 1.7.2
 

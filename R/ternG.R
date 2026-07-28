@@ -208,9 +208,25 @@
 #'   When supplied, the custom list \strong{replaces} the ternP defaults — only the values
 #'   in \code{missing_indicators} (plus true \code{NA}) are counted as missing. Matching is
 #'   always case-insensitive and ignores leading/trailing whitespace.
+#' @param plain_tibble Logical; if \code{TRUE}, returns the tidy per-variable statistics frame
+#'   (see \code{\link{tern_stats}}) instead of the formatted display table — one un-indented row
+#'   per variable with raw numeric statistics and their formatted counterparts in adjacent
+#'   columns. Word/Excel exports and the methods document are still written if requested.
+#'   Setting this is never required to reach the tidy data: the same frame is always attached
+#'   to the normal return value as the \code{"tern_stats"} attribute, so
+#'   \code{tern_stats(ternG(...))} yields both the pretty table and the tidy data from one call.
+#'   Default is \code{FALSE}.
 #'
 #' @return A tibble with one row per variable (multi-row for multi-level factors), showing summary statistics by group,
 #' P values, test type, and optionally odds ratios and total summary column.
+#' Two tidy, machine-readable frames are always attached as attributes:
+#' \code{"tern_stats"} (one row per variable — test, statistic, df, raw numeric P value,
+#' normality decision, odds ratio) and \code{"tern_estimates"} (long format: one row per
+#' variable x group x level, with the underlying counts, percentages, means, SDs, medians and
+#' quartiles). Access them with \code{\link{tern_stats}} and \code{\link{tern_estimates}}
+#' rather than parsing the display table.
+#'
+#' @seealso \code{\link{tern_stats}}, \code{\link{tern_estimates}}
 #'
 #' @examples
 #' data(tern_colon)
@@ -295,7 +311,8 @@ ternG <- function(data,
                   percentage_compute = "column",
                   categorical_posthoc = FALSE,
                   show_missingness = FALSE,
-                  missing_indicators = NULL) {
+                  missing_indicators = NULL,
+                  plain_tibble = FALSE) {
 
   # Helper function for proper rounding (0.5 always rounds up)
   round_up_half <- function(x, digits = 0) {
@@ -373,6 +390,32 @@ ternG <- function(data,
   .ternG_env$cat_posthoc_fisher_display <- character(0)
   # Track which variables used Monte Carlo Fisher's exact (workspace limit fallback)
   .ternG_env$fisher_sim_display  <- character(0)
+  # ── Tidy statistics side-channel (see R/utils_stats_tidy.R) ────────────────
+  # Accumulated from the same objects that populate the display cells, so the
+  # tidy frames can never drift from the rendered table.
+  .ternG_env$stats_records <- list()
+  .ternG_env$est_records   <- list()
+  # Carries the normality verdict across the non-normal recursion below, where
+  # .summarize_var_internal() re-enters itself via the force_ordinal path.
+  .ternG_env$pending_norm  <- NULL
+
+  .record_stats <- function(...) {
+    .ternG_env$stats_records <- c(.ternG_env$stats_records, list(.tern_stat_row(...)))
+    invisible(NULL)
+  }
+  .record_est <- function(...) {
+    .ternG_env$est_records <- c(.ternG_env$est_records, list(.tern_est_row(...)))
+    invisible(NULL)
+  }
+  # Retrieve (and clear) the normality verdict stashed before the recursion.
+  .take_pending_norm <- function(var) {
+    pn <- .ternG_env$pending_norm
+    .ternG_env$pending_norm <- NULL
+    if (is.null(pn) || !identical(pn$var, var)) {
+      return(list(is_normal = NA, sw_p = NA_real_))
+    }
+    list(is_normal = pn$is_normal, sw_p = .tern_min_sw(pn$sw_p))
+  }
 
   .summarize_var_internal <- function(df, var, force_ordinal = NULL, force_continuous = NULL, show_test = FALSE, round_intg = FALSE, round_decimal = NULL, show_total = FALSE) {
 
@@ -516,11 +559,15 @@ ternG <- function(data,
               }
             )
           }
+          # Fisher's exact reports no test statistic or df.
           list(p_value = ft_wrap$result$p.value,
+               statistic = NA_real_, df = NA_real_,
                test_name = if (ft_wrap$simulated) "Fisher exact (simulated)" else "Fisher exact",
                error = NULL)
         } else {
-          list(p_value = stats::chisq.test(tab)$p.value, test_name = "Chi-squared", error = NULL)
+          cs <- stats::chisq.test(tab)
+          list(p_value = cs$p.value, statistic = cs$statistic, df = cs$parameter,
+               test_name = "Chi-squared", error = NULL)
         }
       }, error = function(e) {
         # Determine the reason for failure
@@ -533,11 +580,17 @@ ternG <- function(data,
         } else {
           reason <- "test failure"
         }
-        list(p_value = NA_real_, test_name = if (fisher_flag) "Fisher exact" else "Chi-squared",
+        list(p_value = NA_real_, statistic = NA_real_, df = NA_real_,
+             test_name = if (fisher_flag) "Fisher exact" else "Chi-squared",
              error = reason)
       })
       
       
+      # Raw odds-ratio record for the tidy side-channel. Populated from the same
+      # objects that build the formatted OR string below (never recomputed).
+      or_rec <- list(value = NA_real_, lcl = NA_real_, ucl = NA_real_,
+                     fmt = NA_character_, method = NA_character_)
+
       # Determine if this should use simple format or hierarchical subheads
       # Always use simple format for Y/N variables or when insert_subheads is FALSE
       # Otherwise use hierarchical format for categorical variables
@@ -592,25 +645,35 @@ ternG <- function(data,
         }
 
         if (OR_col && ncol(tab) == 2 && nrow(tab) == 2) {
-          if (OR_method == "dynamic") {
-            if (fisher_flag) {
+          use_fisher_or <- (OR_method == "dynamic" && fisher_flag)
+          if (OR_method == "dynamic" || OR_method == "wald") {
+            or_ok <- FALSE
+            if (use_fisher_or) {
               fisher_obj <- tryCatch(stats::fisher.test(tab), error = function(e) NULL)
               if (!is.null(fisher_obj)) {
-                result$OR <- sprintf("%.2f [%.2f\u2013%.2f]", fisher_obj$estimate, fisher_obj$conf.int[1], fisher_obj$conf.int[2])
-                if (show_test) result$OR_method <- "Fisher"
-              } else {
-                result$OR <- "NA (calculation failed)"
-                if (show_test) result$OR_method <- "Fisher"
+                or_rec$value <- unname(fisher_obj$estimate)
+                or_rec$lcl   <- fisher_obj$conf.int[1]
+                or_rec$ucl   <- fisher_obj$conf.int[2]
+                or_ok        <- TRUE
               }
+              or_rec$method <- "Fisher"
             } else {
               or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-              result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f\u2013%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
-              if (show_test) result$OR_method <- "Wald"
+              if (!is.null(or_obj)) {
+                or_rec$value <- or_obj[2, 1]
+                or_rec$lcl   <- or_obj[2, 2]
+                or_rec$ucl   <- or_obj[2, 3]
+                or_ok        <- TRUE
+              }
+              or_rec$method <- "Wald"
             }
-          } else if (OR_method == "wald") {
-            or_obj <- tryCatch(epitools::oddsratio(tab, method = "wald")$measure, error = function(e) NULL)
-            result$OR <- if (!is.null(or_obj)) sprintf("%.2f [%.2f\u2013%.2f]", or_obj[2,1], or_obj[2,2], or_obj[2,3]) else "NA (calculation failed)"
-            if (show_test) result$OR_method <- "Wald"
+            or_rec$fmt <- if (or_ok) {
+              sprintf("%.2f [%.2f\u2013%.2f]", or_rec$value, or_rec$lcl, or_rec$ucl)
+            } else {
+              "NA (calculation failed)"
+            }
+            result$OR <- or_rec$fmt
+            if (show_test) result$OR_method <- or_rec$method
           }
         } else if (OR_col) {
           result$OR <- "-"
@@ -673,23 +736,33 @@ ternG <- function(data,
           # Reorder columns so reference level is first (groups stay as rows)
           tab_hier2 <- tab[, c(ref_level_hier, non_ref_level_hier), drop = FALSE]
           if (nrow(tab_hier2) == 2 && ncol(tab_hier2) == 2) {
-            or_string_hier <- tryCatch({
-              if (OR_method == "dynamic") {
-                if (fisher_flag) {
-                  fisher_obj2 <- stats::fisher.test(tab_hier2)
-                  sprintf("%.2f [%.2f\u2013%.2f]", fisher_obj2$estimate,
-                          fisher_obj2$conf.int[1], fisher_obj2$conf.int[2])
-                } else {
-                  or_obj2 <- epitools::oddsratio(tab_hier2, method = "wald")$measure
-                  sprintf("%.2f [%.2f\u2013%.2f]", or_obj2[2, 1], or_obj2[2, 2], or_obj2[2, 3])
-                }
-              } else if (OR_method == "wald") {
+            # Compute the raw estimate/CI first, then format from it, so the
+            # tidy side-channel and the displayed string share one computation.
+            or_num_hier <- tryCatch({
+              if (OR_method == "dynamic" && fisher_flag) {
+                fisher_obj2 <- stats::fisher.test(tab_hier2)
+                c(unname(fisher_obj2$estimate), fisher_obj2$conf.int[1], fisher_obj2$conf.int[2])
+              } else if (OR_method == "dynamic" || OR_method == "wald") {
                 or_obj2 <- epitools::oddsratio(tab_hier2, method = "wald")$measure
-                sprintf("%.2f [%.2f\u2013%.2f]", or_obj2[2, 1], or_obj2[2, 2], or_obj2[2, 3])
+                c(or_obj2[2, 1], or_obj2[2, 2], or_obj2[2, 3])
               } else {
-                "NA"
+                NULL
               }
-            }, error = function(e) "NA (calculation failed)")
+            }, error = function(e) NA_real_)
+            or_string_hier <- if (is.null(or_num_hier)) {
+              "NA"
+            } else if (length(or_num_hier) != 3L) {
+              "NA (calculation failed)"
+            } else {
+              sprintf("%.2f [%.2f\u2013%.2f]", or_num_hier[1], or_num_hier[2], or_num_hier[3])
+            }
+            if (length(or_num_hier) == 3L) {
+              or_rec$value <- or_num_hier[1]
+              or_rec$lcl   <- or_num_hier[2]
+              or_rec$ucl   <- or_num_hier[3]
+            }
+            or_rec$fmt    <- or_string_hier
+            or_rec$method <- if (fisher_flag) "Fisher" else "Wald"
             hier_or_vals <- list(
               ref_level = ref_level_hier,
               or_string  = or_string_hier,
@@ -800,15 +873,64 @@ ternG <- function(data,
 
       if (grepl("simulated", test_result$test_name, fixed = FALSE))
         .ternG_env$fisher_sim_display <- c(.ternG_env$fisher_sim_display, result$Variable[1])
+
+      # ── Tidy side-channel: categorical ──────────────────────────────────────
+      .record_stats(
+        variable  = var,
+        label     = result$Variable[1],
+        type      = "categorical",
+        stat_type = "n_pct",
+        n         = nrow(g),
+        n_missing = nrow(df) - nrow(g),
+        n_levels  = ncol(tab),
+        test      = test_result$test_name,
+        statistic = test_result$statistic,
+        df        = test_result$df,
+        p_value   = test_result$p_value,
+        p_fmt     = if (!is.null(test_result$error)) {
+          paste0("NA (", test_result$error, ")")
+        } else {
+          val_p_format(test_result$p_value, p_digits)
+        },
+        test_note = if (is.null(test_result$error)) NA_character_ else test_result$error,
+        or_value  = or_rec$value,
+        or_lcl    = or_rec$lcl,
+        or_ucl    = or_rec$ucl,
+        or_fmt    = or_rec$fmt,
+        or_method = or_rec$method
+      )
+      # Every level is emitted here, including levels the display collapses away
+      # (a binary Y/N variable renders only the "Y" row).
+      for (g_lvl in rownames(tab)) {
+        for (lvl in colnames(tab)) {
+          ri <- match(g_lvl, rownames(tab_n)); ci <- match(lvl, colnames(tab_n))
+          .record_est(
+            variable = var, label = result$Variable[1], group = g_lvl, level = lvl,
+            n = tab_n[ri, ci], pct = tab_pct[ri, ci],
+            value_fmt = paste0(tab_n[ri, ci], " (", tab_pct[ri, ci], "%)")
+          )
+        }
+      }
+      for (lvl in names(tab_total_n)) {
+        ti <- match(lvl, names(tab_total_n))
+        .record_est(
+          variable = var, label = result$Variable[1], group = "Total", level = lvl,
+          n = tab_total_n[[ti]], pct = tab_total_pct[[ti]],
+          value_fmt = paste0(tab_total_n[ti], " (", tab_total_pct[ti], "%)")
+        )
+      }
       return(.add_miss_cols(.missing_row(result)))
     }
 
     # ----- Force ordinal -----
     if (!is.null(force_ordinal) && var %in% force_ordinal) {
+      # Raw quantiles are kept alongside the rounded display values so the tidy
+      # side-channel can report un-rounded statistics without recomputing them.
       stats <- g %>% group_by(.data[[group_var]]) %>% summarise(
-        Q1 = rd(quantile(.data[[var]], 0.25, na.rm = TRUE)),
-        med = rd(median(.data[[var]], na.rm = TRUE)),
-        Q3 = rd(quantile(.data[[var]], 0.75, na.rm = TRUE)), .groups = "drop")
+        Q1_raw  = quantile(.data[[var]], 0.25, na.rm = TRUE),
+        med_raw = median(.data[[var]], na.rm = TRUE),
+        Q3_raw  = quantile(.data[[var]], 0.75, na.rm = TRUE), .groups = "drop") %>%
+        dplyr::mutate(Q1 = rd(.data$Q1_raw), med = rd(.data$med_raw), Q3 = rd(.data$Q3_raw))
       result <- tibble(Variable = .clean_variable_name_for_header(var), .indent = 2)
       for (g_lvl in group_levels) {
         val <- stats %>% filter(.data[[group_var]] == g_lvl)
@@ -821,11 +943,14 @@ ternG <- function(data,
       
       test_result <- tryCatch({
         if (n_levels == 2) {
-          p_val <- stats::wilcox.test(g[[var]] ~ g[[group_var]])$p.value
-          list(p_value = p_val, test_name = "Wilcoxon rank-sum", error = NULL)
+          ht <- stats::wilcox.test(g[[var]] ~ g[[group_var]])
+          # Wilcoxon reports W but no degrees of freedom.
+          list(p_value = ht$p.value, statistic = ht$statistic, df = NA_real_,
+               test_name = "Wilcoxon rank-sum", error = NULL)
         } else {
-          p_val <- stats::kruskal.test(g[[var]] ~ g[[group_var]])$p.value
-          list(p_value = p_val, test_name = "Kruskal-Wallis", error = NULL)
+          ht <- stats::kruskal.test(g[[var]] ~ g[[group_var]])
+          list(p_value = ht$p.value, statistic = ht$statistic, df = ht$parameter,
+               test_name = "Kruskal-Wallis", error = NULL)
         }
       }, error = function(e) {
         # Determine reason for test failure
@@ -838,7 +963,8 @@ ternG <- function(data,
           reason <- "test failure"
         }
         test_name <- if (n_levels == 2) "Wilcoxon rank-sum" else "Kruskal-Wallis"
-        list(p_value = NA_real_, test_name = test_name, error = reason)
+        list(p_value = NA_real_, statistic = NA_real_, df = NA_real_,
+             test_name = test_name, error = reason)
       })
       
       if (!is.null(test_result$error)) {
@@ -853,11 +979,14 @@ ternG <- function(data,
       }
       
       if (OR_col) result$OR <- "-"
+      # Computed unconditionally so the display cell and the tidy Total record
+      # come from a single computation.
+      val_total <- g %>% dplyr::summarise(
+        Q1_raw  = quantile(.data[[var]], 0.25, na.rm = TRUE),
+        med_raw = median(.data[[var]], na.rm = TRUE),
+        Q3_raw  = quantile(.data[[var]], 0.75, na.rm = TRUE)) %>%
+        dplyr::mutate(Q1 = rd(.data$Q1_raw), med = rd(.data$med_raw), Q3 = rd(.data$Q3_raw))
       if (show_total) {
-        val_total <- g %>% dplyr::summarise(
-          Q1  = rd(quantile(.data[[var]], 0.25, na.rm = TRUE)),
-          med = rd(median(.data[[var]], na.rm = TRUE)),
-          Q3  = rd(quantile(.data[[var]], 0.75, na.rm = TRUE)))
         result$Total <- paste0(val_total$med, " [", val_total$Q1, "\u2013", val_total$Q3, "]")
       }
       if (print_normality) {
@@ -905,6 +1034,47 @@ ternG <- function(data,
       }
       if (grepl("simulated", test_result$test_name, fixed = FALSE))
         .ternG_env$fisher_sim_display <- c(.ternG_env$fisher_sim_display, result$Variable[1])
+
+      # ── Tidy side-channel: ordinal / non-normal continuous ──────────────────
+      # `pending` carries the normality verdict from the caller when this branch
+      # was reached by the non-normal recursion; it is empty for force_ordinal
+      # variables, whose distribution is never assessed.
+      pending <- .take_pending_norm(var)
+      .record_stats(
+        variable  = var,
+        label     = result$Variable[1],
+        type      = "continuous",
+        stat_type = "median_iqr",
+        n         = nrow(g),
+        n_missing = nrow(df) - nrow(g),
+        test      = test_result$test_name,
+        statistic = test_result$statistic,
+        df        = test_result$df,
+        p_value   = test_result$p_value,
+        p_fmt     = if (!is.null(test_result$error)) {
+          paste0("NA (", test_result$error, ")")
+        } else {
+          val_p_format(test_result$p_value, p_digits)
+        },
+        test_note = if (is.null(test_result$error)) NA_character_ else test_result$error,
+        is_normal = pending$is_normal,
+        sw_p      = pending$sw_p
+      )
+      for (g_lvl in group_levels) {
+        val <- stats %>% filter(.data[[group_var]] == g_lvl)
+        if (nrow(val) != 1) next
+        .record_est(
+          variable = var, label = result$Variable[1], group = g_lvl,
+          n = sum(g[[group_var]] == g_lvl, na.rm = TRUE),
+          median = val$med_raw, q1 = val$Q1_raw, q3 = val$Q3_raw,
+          value_fmt = paste0(val$med, " [", val$Q1, "\u2013", val$Q3, "]")
+        )
+      }
+      .record_est(
+        variable = var, label = result$Variable[1], group = "Total",
+        n = nrow(g), median = val_total$med_raw, q1 = val_total$Q1_raw, q3 = val_total$Q3_raw,
+        value_fmt = paste0(val_total$med, " [", val_total$Q1, "\u2013", val_total$Q3, "]")
+      )
       return(.add_miss_cols(.missing_row(result)))
     }
 
@@ -984,7 +1154,14 @@ ternG <- function(data,
     }
 
     if (!is_normal) {
-      return(.summarize_var_internal(df, var = var, force_ordinal = var, show_test = show_test, round_intg = round_intg, round_decimal = round_decimal, show_total = show_total))
+      # Stash the normality verdict so the ordinal branch below (re-entered via
+      # this recursion) can record it in the tidy frame — it is not otherwise
+      # recoverable once we hand off to the force_ordinal path.
+      .ternG_env$pending_norm <- list(var = var, is_normal = FALSE, sw_p = sw_p_all)
+      # force_continuous must be forwarded: without it the recursion re-enters the
+      # automatic binary 0/1 detection and converts the variable to categorical
+      # Y/N, which is precisely what force_continuous exists to prevent.
+      return(.summarize_var_internal(df, var = var, force_ordinal = var, force_continuous = force_continuous, show_test = show_test, round_intg = round_intg, round_decimal = round_decimal, show_total = show_total))
     }
 
     # ----- Normally distributed numeric -----
@@ -1004,11 +1181,15 @@ ternG <- function(data,
 
     test_result <- tryCatch({
       if (n_levels == 2) {
-        p_val <- stats::t.test(g[[var]] ~ g[[group_var]], var.equal = FALSE)$p.value
-        list(p_value = p_val, test_name = "Welch t-test", error = NULL)
+        ht <- stats::t.test(g[[var]] ~ g[[group_var]], var.equal = FALSE)
+        list(p_value = ht$p.value, statistic = ht$statistic, df = ht$parameter,
+             test_name = "Welch t-test", error = NULL)
       } else {
-        p_val <- stats::oneway.test(g[[var]] ~ g[[group_var]], var.equal = FALSE)$p.value
-        list(p_value = p_val, test_name = "Welch ANOVA", error = NULL)
+        ht <- stats::oneway.test(g[[var]] ~ g[[group_var]], var.equal = FALSE)
+        # oneway.test reports numerator and denominator df.
+        list(p_value = ht$p.value, statistic = ht$statistic,
+             df = ht$parameter[1], df2 = ht$parameter[2],
+             test_name = "Welch ANOVA", error = NULL)
       }
     }, error = function(e) {
       # Determine reason for test failure
@@ -1023,7 +1204,8 @@ ternG <- function(data,
         reason <- paste0("test failure: ", conditionMessage(e))
       }
       test_name <- if (n_levels == 2) "Welch t-test" else "Welch ANOVA"
-      list(p_value = NA_real_, test_name = test_name, error = reason)
+      list(p_value = NA_real_, statistic = NA_real_, df = NA_real_,
+           test_name = test_name, error = reason)
     })
     
     if (!is.null(test_result$error)) {
@@ -1038,8 +1220,10 @@ ternG <- function(data,
     }
     
     if (OR_col) result$OR <- "-"
+    # Computed unconditionally so the display cell and the tidy Total record
+    # come from a single computation.
+    val_total <- g %>% dplyr::summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
     if (show_total) {
-      val_total <- g %>% dplyr::summarise(mean = mean(.data[[var]], na.rm = TRUE), sd = sd(.data[[var]], na.rm = TRUE))
       result$Total <- paste0(rd(val_total$mean), " \u00b1 ", rd(val_total$sd))
     }
 
@@ -1080,6 +1264,44 @@ ternG <- function(data,
           .ternG_env$posthoc_ran_display <- c(.ternG_env$posthoc_ran_display, result$Variable[1])
         }
     }
+
+    # ── Tidy side-channel: normally-distributed continuous ────────────────────
+    .record_stats(
+      variable  = var,
+      label     = result$Variable[1],
+      type      = "continuous",
+      stat_type = "mean_sd",
+      n         = nrow(g),
+      n_missing = nrow(df) - nrow(g),
+      test      = test_result$test_name,
+      statistic = test_result$statistic,
+      df        = test_result$df,
+      df2       = test_result$df2,
+      p_value   = test_result$p_value,
+      p_fmt     = if (!is.null(test_result$error)) {
+        paste0("NA (", test_result$error, ")")
+      } else {
+        val_p_format(test_result$p_value, p_digits)
+      },
+      test_note = if (is.null(test_result$error)) NA_character_ else test_result$error,
+      is_normal = TRUE,
+      sw_p      = .tern_min_sw(sw_p_all)
+    )
+    for (g_lvl in group_levels) {
+      val <- stats %>% filter(.data[[group_var]] == g_lvl)
+      if (nrow(val) != 1) next
+      .record_est(
+        variable = var, label = result$Variable[1], group = g_lvl,
+        n = sum(g[[group_var]] == g_lvl, na.rm = TRUE),
+        mean = val$mean, sd = val$sd,
+        value_fmt = paste0(rd(val$mean), " \u00b1 ", rd(val$sd))
+      )
+    }
+    .record_est(
+      variable = var, label = result$Variable[1], group = "Total",
+      n = nrow(g), mean = val_total$mean, sd = val_total$sd,
+      value_fmt = paste0(rd(val_total$mean), " \u00b1 ", rd(val_total$sd))
+    )
     return(.add_miss_cols(.missing_row(result)))
   }
 
@@ -1088,7 +1310,14 @@ ternG <- function(data,
     cli::cli_alert_info("Multi-level categorical variables occupy more than one row in the output table.")
     result
   })
-                        
+
+  # ── Assemble the tidy side-channel frames ─────────────────────────────────
+  # Records were appended in `vars` order, one per summarized variable, so these
+  # frames stay row-aligned with the display table's variable sequence.
+  stats_tbl <- .tern_bind_stats(.ternG_env$stats_records)
+  est_tbl   <- .tern_bind_est(.ternG_env$est_records)
+
+
   # -- Standardize group headers and enforce final column order (level-agnostic)
   # Keep the group column names with "n = x" format as requested
 
@@ -1143,6 +1372,13 @@ ternG <- function(data,
       }
       fdr_vals <- p.adjust(raw_vals[adj_idx], method = "BH")
       fdr_fmt  <- vapply(fdr_vals, val_p_format, character(1), digits = p_digits)
+      # Same correction pool, one computation: `.p_raw` is non-NA exactly once
+      # per variable, matching the tidy frame's one-row-per-variable p_value.
+      stat_idx <- which(!is.na(stats_tbl$p_value))
+      if (length(stat_idx) == length(fdr_vals)) {
+        stats_tbl$p_adjusted[stat_idx]     <- fdr_vals
+        stats_tbl$p_adjusted_fmt[stat_idx] <- fdr_fmt
+      }
       # Template from P column: preserves "-" (sub-rows) and "" (header rows) as-is
       fdr_col         <- out_tbl[["P"]]
       fdr_col[adj_idx] <- fdr_fmt
@@ -1270,6 +1506,13 @@ ternG <- function(data,
         out_tbl$Variable[i] <- .apply_cleaning_rules(current_var)
       }
     }
+    # Keep the tidy frames' display labels in step with the rendered table.
+    # Variable header rows never carry leading padding, so the simple branch of
+    # the loop above is the only one that applies here.
+    if (nrow(stats_tbl) > 0L)
+      stats_tbl$label <- vapply(stats_tbl$label, .apply_cleaning_rules, character(1), USE.NAMES = FALSE)
+    if (nrow(est_tbl) > 0L)
+      est_tbl$label <- vapply(est_tbl$label, .apply_cleaning_rules, character(1), USE.NAMES = FALSE)
   }
 
   # Save with .indent intact for ternB multi-table export metadata
@@ -1380,6 +1623,17 @@ ternG <- function(data,
     show_missingness      = show_missingness,
     missing_indicators    = missing_indicators
   )
+
+  # Attach the tidy side-channel. Always attached (it is cheap) so a single call
+  # yields the formatted table plus machine-readable results — see tern_stats().
+  attr(out_tbl, "tern_stats")     <- stats_tbl
+  attr(out_tbl, "tern_estimates") <- est_tbl
+
+  if (isTRUE(plain_tibble)) {
+    attr(stats_tbl, "tern_stats")     <- stats_tbl
+    attr(stats_tbl, "tern_estimates") <- est_tbl
+    return(stats_tbl)
+  }
 
   return(out_tbl)
 }
